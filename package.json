@@ -10,7 +10,8 @@
     "seed": "npx tsx scripts/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "smoke:rls": "npx tsx scripts/smoke-rls.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

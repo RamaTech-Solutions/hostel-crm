@@ -69,14 +69,18 @@ psql "$DATABASE_URL" -f backups/pre-saas-migration/data.sql
 
 ## Production apply status (14 August 2026)
 
-**BLOCKED — migrations were not applied to the linked production database.**
+**APPLIED** on linked project `pg-crm-demo` (history 20260814120000–20260814120700 in sync).
 
 | Check | Result |
 |-------|--------|
-| Backup `supabase db dump --linked` | Failed — no `SUPABASE_ACCESS_TOKEN` / CLI session |
-| Local `supabase start` | Failed — Docker/Podman not installed |
-| Dry-run `db push --linked` | Not run (cannot distinguish a safe linked session) |
-| `db reset --linked` | Never used |
+| Backup | `backups/pre-saas-migration/schema.sql` (~46K) and `data.sql` (~103K), gitignored |
+| Remote vs audit | 17 public tables; pre-apply RLS matched the audit (org-wide contacts/docs) |
+| Baseline | `20260814120000` marked applied (not re-executed) |
+| Dry-run | Would push 201–207 only; no DROP TABLE/SCHEMA/TYPE/TRUNCATE |
+| `db push` | Applied 201–207 |
+| `db lint --linked` | No schema errors |
+| Smoke `npx tsx scripts/smoke-rls.ts` | Demo owner/manager/viewer OK; manager sees 1 of 3 properties; viewer cannot insert rooms; disposable org cannot see demo residents; bootstrap idempotent |
 
-**Safe next action:** Install Docker Desktop (for local migration tests) and log in with `supabase login`, then run the backup → repair baseline → dry-run → push sequence in the runbook. Do not re-apply `supabase/legacy` or the baseline file on production.
+**Safe next action:** Merge `feat/awaasly-saas-foundation` to `main` so Vercel serves `/signup` and `/onboarding` against this database. Confirm Vercel `NEXT_PUBLIC_APP_URL` and Auth callback URLs.
+
 

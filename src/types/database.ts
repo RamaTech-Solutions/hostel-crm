@@ -1,3 +1,4 @@
+/** App-facing types. Regenerated schema snapshot: ./database.generated.ts */
 export type Json =
   | string
   | number

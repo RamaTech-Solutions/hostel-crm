@@ -62,4 +62,20 @@ Do not apply if backup fails, history cannot be reconciled, dry-run drops unexpe
 
 ## Local
 
-Docker is required for `supabase start`. If Docker is missing, run `npm test`, `npm run lint`, `npm run build` only; do not assume RLS SQL executed.
+Docker Desktop must be running. If `docker` is not on PATH, use:
+
+```bash
+export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
+```
+
+`supabase db lint --linked` was used against production after apply (no schema errors). `supabase start` is optional for a full local stack.
+
+## Smoke after apply
+
+```bash
+npx tsx scripts/smoke-rls.ts
+```
+
+Expected: demo owner/manager/viewer login, property isolation, viewer write blocked, disposable tenant cannot see demo rows.
+
