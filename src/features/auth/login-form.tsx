@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { toUserError } from "@/lib/user-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const demoUnavailable = searchParams.get("error") === "demo";
+  const authLinkError = searchParams.get("error") === "auth";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +30,7 @@ export function LoginForm() {
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError(authError.message);
+      setError(toUserError(authError.message, "Email or password is incorrect."));
       setLoading(false);
       return;
     }
@@ -40,11 +42,11 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+        <Link href="/" className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
           <Building2 className="h-6 w-6 text-primary-foreground" />
-        </div>
-        <CardTitle className="text-2xl">PG Management CRM</CardTitle>
-        <CardDescription>Sign in to manage your properties</CardDescription>
+        </Link>
+        <CardTitle className="text-2xl">Awaasly</CardTitle>
+        <CardDescription>Rooms. Residents. Rent. One simple system.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -78,6 +80,11 @@ export function LoginForm() {
               Demo is temporarily unavailable. Please try again.
             </p>
           )}
+          {authLinkError && (
+            <p className="text-sm text-destructive" role="alert">
+              That confirmation link is invalid or has expired. Try signing in or create the account again.
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
@@ -95,13 +102,10 @@ export function LoginForm() {
         <Button asChild variant="outline" className="w-full">
           <Link href="/demo">Explore Demo Dashboard</Link>
         </Button>
-        <p className="mt-3 text-center text-sm text-muted-foreground">
-          Explore the product using sample hostel data.
-        </p>
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to Awaasly?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/signup" className="text-primary underline-offset-4 hover:underline">
-            Create an account
+            Create account
           </Link>
         </p>
       </CardContent>

@@ -2,10 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const AUTH_PATHS = ["/login", "/signup"];
-const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback", "/setup", "/demo"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/auth/callback",
+  "/setup",
+  "/demo",
+];
 
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (pathname === "/") return true;
+  return PUBLIC_PATHS.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
 }
 
 export async function middleware(request: NextRequest) {
@@ -34,23 +42,39 @@ export async function middleware(request: NextRequest) {
       .maybeSingle();
 
     let ready = false;
-    if (profile?.organization_id) {
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("*")
-        .eq("id", profile.organization_id)
-        .maybeSingle();
-      ready = Boolean(org?.is_demo || org?.onboarding_completed_at || org?.slug === "urbanstay-pg");
+    let forceOwnerOnboarding = false;
+
+    if (!profile?.organization_id) {
+      forceOwnerOnboarding = true;
+    } else {
+      const [{ data: org }, { data: roleRecord }] = await Promise.all([
+        supabase
+          .from("organizations")
+          .select("is_demo, onboarding_completed_at, slug")
+          .eq("id", profile.organization_id)
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+
+      const role = roleRecord?.role ?? "viewer";
+      const staff = role === "property_admin" || role === "viewer";
+      const complete = Boolean(org?.is_demo || org?.onboarding_completed_at || org?.slug === "urbanstay-pg");
+      ready = staff || complete;
+      forceOwnerOnboarding = !staff && !complete;
     }
 
-    const needsOnboarding = !ready;
     const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+    const onAuthForm = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-    if (needsOnboarding && !onOnboarding && !pathname.startsWith("/auth/callback")) {
+    if (forceOwnerOnboarding && !onOnboarding && !pathname.startsWith("/auth/callback")) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
 
-    if (ready && (onOnboarding || AUTH_PATHS.some((p) => pathname.startsWith(p)))) {
+    if (ready && (onOnboarding || onAuthForm)) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

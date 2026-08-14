@@ -13,11 +13,12 @@ import {
   transferSchema,
 } from "@/lib/validations/schemas";
 import { maskIdNumber } from "@/lib/utils";
+import { toUserError } from "@/lib/user-error";
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }
 
 export async function createProperty(formData: FormData) {
@@ -47,16 +48,18 @@ export async function createProperty(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: toUserError(error.message) };
 
-  const floorCount = parsed.data.floor_count;
-  const floors = Array.from({ length: floorCount }, (_, i) => ({
-    property_id: data.id,
-    organization_id: user.organization.id,
-    floor_number: i + 1,
-    label: i === 0 ? "Ground" : `Floor ${i + 1}`,
-  }));
-  await supabase.from("floors").insert(floors);
+  if (formData.get("defer_floors") !== "1") {
+    const floorCount = parsed.data.floor_count;
+    const floors = Array.from({ length: floorCount }, (_, i) => ({
+      property_id: data.id,
+      organization_id: user.organization.id,
+      floor_number: i + 1,
+      label: i === 0 ? "Ground Floor" : `Floor ${i + 1}`,
+    }));
+    await supabase.from("floors").insert(floors);
+  }
 
   await logActivity(user.organization.id, user.id, "created", "property", data.id);
   revalidatePath("/properties");
@@ -122,7 +125,7 @@ export async function createRoom(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: toUserError(error.message) };
 
   const bedLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const beds = Array.from({ length: parsed.data.bed_capacity }, (_, i) => ({
@@ -512,7 +515,7 @@ export async function bootstrapOrganization(input?: {
     p_phone: phone,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: toUserError(error.message) };
   return { organizationId: data as string };
 }
 
@@ -526,9 +529,108 @@ export async function completeOnboarding() {
     .update({ onboarding_completed_at: new Date().toISOString() })
     .eq("id", user.organization.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: toUserError(error.message) };
   revalidatePath("/dashboard");
   redirect("/dashboard");
+}
+
+export async function completeOnboardingToResidents() {
+  const user = await requireAuthUser();
+  if (user.role !== "owner") return { error: "Only owners can complete onboarding" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizations")
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq("id", user.organization.id);
+
+  if (error) return { error: toUserError(error.message) };
+  revalidatePath("/dashboard");
+  redirect("/residents/new");
+}
+
+export async function startOwnWorkspace() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/signup");
+}
+
+export async function updateOnboardingWorkspace(formData: FormData) {
+  const user = await requireAuthUser();
+  if (user.role !== "owner") return { error: "Only owners can update this" };
+
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const organizationName = String(formData.get("organization_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+
+  if (fullName.length < 2) return { error: "Full name is required" };
+  if (organizationName.length < 2) return { error: "Business name is required" };
+
+  const supabase = await createClient();
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName, phone: phone || null })
+    .eq("id", user.id);
+  if (profileError) return { error: toUserError(profileError.message) };
+
+  const { error: orgError } = await supabase
+    .from("organizations")
+    .update({ name: organizationName })
+    .eq("id", user.organization.id);
+  if (orgError) return { error: toUserError(orgError.message) };
+
+  revalidatePath("/onboarding");
+  return { success: true };
+}
+
+export async function setupOnboardingFloors(propertyId: string, floorCount: number) {
+  const user = await requireAuthUser();
+  if (user.role !== "owner" || !canAccessProperty(user, propertyId)) {
+    return { error: "Unauthorized" };
+  }
+  const count = Math.min(50, Math.max(1, Math.floor(floorCount)));
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("floors")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("floor_number");
+
+  if (existing?.length) {
+    await supabase
+      .from("properties")
+      .update({ floor_count: existing.length })
+      .eq("id", propertyId);
+    return { data: existing };
+  }
+
+  const floors = Array.from({ length: count }, (_, i) => ({
+    property_id: propertyId,
+    organization_id: user.organization.id,
+    floor_number: i,
+    label: i === 0 ? "Ground Floor" : `Floor ${i}`,
+  }));
+
+  const { data, error } = await supabase.from("floors").insert(floors).select();
+  if (error) return { error: toUserError(error.message) };
+
+  await supabase.from("properties").update({ floor_count: count }).eq("id", propertyId);
+  revalidatePath("/onboarding");
+  return { data };
+}
+
+export async function updateFloorLabel(floorId: string, label: string) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: "Unauthorized" };
+  const trimmed = label.trim();
+  if (!trimmed) return { error: "Floor name is required" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("floors").update({ label: trimmed }).eq("id", floorId);
+  if (error) return { error: toUserError(error.message) };
+  revalidatePath("/onboarding");
+  return { success: true };
 }
 
 export async function createFloor(formData: FormData) {
@@ -555,7 +657,7 @@ export async function createFloor(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: toUserError(error.message) };
   revalidatePath(`/properties/${propertyId}`);
   return { data };
 }

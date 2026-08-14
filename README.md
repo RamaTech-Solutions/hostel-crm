@@ -1,69 +1,49 @@
-# PG Management CRM
+# Awaasly
 
-Multi-property Hostel / PG Management demo built with Next.js 15, Supabase, and Tailwind CSS.
+PG and hostel operations for owners — Next.js 15, Supabase, and Tailwind CSS. A product of Ramatech Innovation Pvt Ltd.
 
-## Quick Start (Localhost)
-
-### 1. Install dependencies
+## Quick start
 
 ```bash
 cd pg-crm
 npm install
+cp .env.example .env.local
 ```
 
-### 2. Set up Supabase
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. Copy `.env.example` to `.env.local` and fill in your keys
-3. Run migrations in Supabase SQL Editor:
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_rls_policies.sql`
-4. Create Storage bucket `resident-documents` (private)
-5. Add Auth redirect URLs: `http://localhost:3000/**`
-
-### 3. Seed demo data
-
-```bash
-npm run seed
-```
-
-### 4. Run locally
+Fill Supabase keys in `.env.local`. Database changes are in `supabase/migrations/` (CLI). Do not re-run `supabase/legacy/` on production.
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000) for the public landing page.
 
-**Demo login:** `owner@demo-hostel.com` / `Demo@12345`
+## Main routes
 
-## Deploy to Vercel
-
-1. Push to GitHub
-2. Import in Vercel
-3. Set environment variables (same as `.env.local`)
-4. Add production URL to Supabase Auth redirect URLs
+| Path | Who |
+|------|-----|
+| `/` | Public Awaasly site |
+| `/signup` | New owner |
+| `/login` | Existing users |
+| `/demo` | One-click demo (no credentials on the page) |
+| `/onboarding` | New owners until setup is complete |
+| `/dashboard` | Signed-in operations |
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start dev server |
+| `npm run dev` | Dev server |
 | `npm run build` | Production build |
-| `npm run seed` | Seed demo data |
-| `npm test` | Run unit tests |
-| `npm run test:e2e` | Run Playwright E2E |
-
-## Architecture
-
-- **Frontend:** Next.js 15 App Router, TypeScript, Tailwind, shadcn-style UI
-- **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS)
-- **Auth:** Email/password via Supabase Auth with middleware session refresh
+| `npm run seed` | Seed demo org (service role) |
+| `npm test` | Unit tests |
+| `npm run smoke:rls` | Live tenant-isolation smoke |
+| `npm run test:e2e` | Playwright |
 
 ## Roles
 
 | Role | Access |
 |------|--------|
-| Owner | All properties, full CRUD, team management |
+| Owner | All properties in their organization |
 | Property Admin | Assigned properties only |
 | Viewer | Read-only on assigned properties |

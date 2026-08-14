@@ -5,13 +5,19 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-export const signupSchema = z.object({
-  full_name: z.string().min(2, "Full name is required"),
-  organization_name: z.string().min(2, "Business name is required"),
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  phone: z.string().regex(/^\d{10}$/, "Enter valid 10-digit mobile").optional().or(z.literal("")),
-});
+export const signupSchema = z
+  .object({
+    full_name: z.string().min(2, "Full name is required"),
+    organization_name: z.string().min(2, "Business name is required"),
+    email: z.string().email("Enter a valid email"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirm_password: z.string().min(8, "Confirm your password"),
+    phone: z.string().regex(/^\d{10}$/, "Enter a valid 10-digit mobile number"),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
 
 export const propertySchema = z.object({
   name: z.string().min(2, "Property name is required"),

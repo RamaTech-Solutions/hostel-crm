@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PG Management CRM",
-  description: "Multi-property Hostel & PG Management System",
+  title: "Awaasly — Run all your PGs from one place",
+  description: "Manage properties, rooms, beds, residents, rent and daily PG operations from one dashboard. A product of Ramatech Innovation Pvt Ltd.",
 };
 
 export default function RootLayout({

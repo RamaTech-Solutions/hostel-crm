@@ -32,6 +32,17 @@ export async function getTenantGate(): Promise<TenantGate> {
 
   if (!organization) return { status: "needs_bootstrap", userId: user.id };
 
+  const { data: roleRecord } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const role = roleRecord?.role;
+  if (role === "property_admin" || role === "viewer") {
+    return { status: "ready", userId: user.id };
+  }
+
   if (organization.is_demo || organization.onboarding_completed_at || organization.slug === "urbanstay-pg") {
     return { status: "ready", userId: user.id };
   }
