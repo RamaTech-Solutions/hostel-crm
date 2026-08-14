@@ -136,6 +136,23 @@ async function main() {
 
     const { data: smokeOrg } = await smoke.from("organizations").select("id, slug").single();
     if (!smokeOrg?.slug?.startsWith("smoke-pg-")) fail("unexpected new org slug");
+
+    const { error: propErr } = await smoke
+      .from("properties")
+      .insert({
+        organization_id: smokeOrg.id,
+        name: "Smoke Property",
+        address_line: "1 Test Street",
+        city: "Delhi",
+        state: "Delhi",
+        pincode: "110001",
+        status: "active",
+        floor_count: 1,
+      })
+      .select("id")
+      .single();
+    if (propErr) fail(propErr.message);
+    console.log("OK disposable owner can insert property");
     console.log("OK disposable signup isolated and idempotent");
 
     await admin.from("organizations").delete().eq("id", smokeOrg.id);
