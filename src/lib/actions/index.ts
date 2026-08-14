@@ -49,6 +49,15 @@ export async function createProperty(formData: FormData) {
 
   if (error) return { error: error.message };
 
+  const floorCount = parsed.data.floor_count;
+  const floors = Array.from({ length: floorCount }, (_, i) => ({
+    property_id: data.id,
+    organization_id: user.organization.id,
+    floor_number: i + 1,
+    label: i === 0 ? "Ground" : `Floor ${i + 1}`,
+  }));
+  await supabase.from("floors").insert(floors);
+
   await logActivity(user.organization.id, user.id, "created", "property", data.id);
   revalidatePath("/properties");
   revalidatePath("/dashboard");
@@ -471,27 +480,126 @@ export async function checkoutResident(residentId: string, formData: FormData) {
   return { success: true };
 }
 
-export async function uploadDocument(
-  residentId: string,
-  documentType: string,
-  fileName: string,
-  storagePath: string,
-  mimeType: string,
-  fileSize: number
-) {
+export async function bootstrapOrganization(input?: {
+  organizationName?: string;
+  fullName?: string;
+  phone?: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const meta = user.user_metadata ?? {};
+  const organizationName =
+    input?.organizationName?.trim() ||
+    String(meta.organization_name ?? meta.organizationName ?? "").trim();
+  const fullName =
+    input?.fullName?.trim() ||
+    String(meta.full_name ?? meta.fullName ?? "").trim() ||
+    user.email?.split("@")[0] ||
+    "Owner";
+  const phone = input?.phone?.trim() || String(meta.phone ?? "").trim() || null;
+
+  if (!organizationName) {
+    return { error: "Organization name is required" };
+  }
+
+  const { data, error } = await supabase.rpc("bootstrap_organization", {
+    p_organization_name: organizationName,
+    p_full_name: fullName,
+    p_phone: phone,
+  });
+
+  if (error) return { error: error.message };
+  return { organizationId: data as string };
+}
+
+export async function completeOnboarding() {
+  const user = await requireAuthUser();
+  if (user.role !== "owner") return { error: "Only owners can complete onboarding" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizations")
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq("id", user.organization.id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
+export async function createFloor(formData: FormData) {
   const user = await requireAuthUser();
   if (!canWrite(user)) return { error: "Unauthorized" };
+
+  const propertyId = String(formData.get("property_id") ?? "");
+  const floorNumber = Number(formData.get("floor_number") ?? 1);
+  const label = String(formData.get("label") ?? "").trim() || `Floor ${floorNumber}`;
+
+  if (!propertyId || !canAccessProperty(user, propertyId)) {
+    return { error: "Unauthorized" };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("floors")
+    .insert({
+      property_id: propertyId,
+      organization_id: user.organization.id,
+      floor_number: floorNumber,
+      label,
+    })
+    .select()
+    .single();
+
+  if (error) return { error: error.message };
+  revalidatePath(`/properties/${propertyId}`);
+  return { data };
+}
+
+export async function uploadDocument(formData: FormData) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: "Unauthorized" };
+
+  const residentId = String(formData.get("residentId") ?? "");
+  const documentType = String(formData.get("documentType") ?? "other");
+  const file = formData.get("file");
+
+  if (!residentId || !(file instanceof File) || file.size === 0) {
+    return { error: "File and resident are required" };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { error: "File must be under 5MB" };
+  }
 
   const supabase = await createClient();
   const { data: resident } = await supabase
     .from("residents")
-    .select("property_id")
+    .select("id, property_id, organization_id")
     .eq("id", residentId)
     .single();
 
-  if (!resident?.property_id || !canAccessProperty(user, resident.property_id)) {
+  if (
+    !resident ||
+    resident.organization_id !== user.organization.id ||
+    !resident.property_id ||
+    !canAccessProperty(user, resident.property_id)
+  ) {
     return { error: "Unauthorized" };
   }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storagePath = `${resident.organization_id}/${resident.property_id}/${resident.id}/${Date.now()}-${safeName}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await supabase.storage
+    .from("resident-documents")
+    .upload(storagePath, buffer, { contentType: file.type || "application/octet-stream" });
+
+  if (uploadError) return { error: uploadError.message };
 
   const { data, error } = await supabase
     .from("resident_documents")
@@ -500,10 +608,10 @@ export async function uploadDocument(
       organization_id: user.organization.id,
       uploaded_by: user.id,
       document_type: documentType,
-      file_name: fileName,
+      file_name: file.name,
       storage_path: storagePath,
-      mime_type: mimeType,
-      file_size: fileSize,
+      mime_type: file.type,
+      file_size: file.size,
     })
     .select()
     .single();

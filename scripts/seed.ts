@@ -110,7 +110,13 @@ async function seed() {
   // Organization
   const { data: org, error: orgError } = await supabase
     .from("organizations")
-    .upsert({ name: "UrbanStay PG", slug: "urbanstay-pg", is_active: true }, { onConflict: "slug" })
+    .upsert({
+      name: "UrbanStay PG",
+      slug: "urbanstay-pg",
+      is_active: true,
+      is_demo: true,
+      onboarding_completed_at: new Date().toISOString(),
+    }, { onConflict: "slug" })
     .select()
     .single();
   if (orgError) throw orgError;
@@ -160,6 +166,17 @@ async function seed() {
   }
   console.log(`✓ ${properties.length} properties created`);
 
+  const propertyFloors = new Map<string, string>();
+  for (const prop of properties) {
+    const { data: floor } = await supabase.from("floors").upsert({
+      property_id: prop.id,
+      organization_id: org.id,
+      floor_number: 0,
+      label: "Ground / Unassigned",
+    }, { onConflict: "property_id,floor_number" }).select().single();
+    if (floor) propertyFloors.set(prop.id, floor.id);
+  }
+
   // Assign manager to first property only
   await supabase.from("property_user_assignments").upsert({
     user_id: managerId, property_id: properties[0].id, organization_id: org.id,
@@ -178,6 +195,7 @@ async function seed() {
       const { data: room } = await supabase.from("rooms").insert({
         property_id: prop.id,
         organization_id: org.id,
+        floor_id: propertyFloors.get(prop.id) ?? null,
         room_number: String(100 + r),
         room_type: bedCapacity <= 2 ? "double" : "triple",
         bed_capacity: bedCapacity,
@@ -245,8 +263,6 @@ async function seed() {
       relation: "Father",
       phone: randomMobile(),
     });
-
-    const { data: room } = await supabase.from("rooms").select("id").eq("id", bed.room_id).single();
 
     const { data: assignment } = await supabase.from("bed_assignments").insert({
       resident_id: resident.id,

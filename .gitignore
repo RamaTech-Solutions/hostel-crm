@@ -37,6 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# database dumps (never commit customer/demo data)
+/backups/
+
+# supabase CLI local artifacts
+supabase/.temp/
+supabase/.branches/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

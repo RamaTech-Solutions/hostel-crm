@@ -16,4 +16,11 @@ test.describe("PG CRM", () => {
     await page.goto("/login");
     await expect(page.getByRole("link", { name: /Explore Demo Dashboard/i })).toBeVisible();
   });
+
+  test("signup page uses Awaasly branding", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
+    await expect(page.getByLabel("Your name")).toBeVisible();
+    await expect(page.getByLabel("Business / PG name")).toBeVisible();
+  });
 });

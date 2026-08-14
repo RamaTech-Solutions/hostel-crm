@@ -2,6 +2,43 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthUser, UserRole } from "@/types/database";
 
+export type TenantGate =
+  | { status: "anonymous" }
+  | { status: "needs_bootstrap"; userId: string }
+  | { status: "needs_onboarding"; userId: string }
+  | { status: "ready"; userId: string };
+
+export async function getTenantGate(): Promise<TenantGate> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { status: "anonymous" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile) return { status: "needs_bootstrap", userId: user.id };
+
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", profile.organization_id)
+    .maybeSingle();
+
+  if (!organization) return { status: "needs_bootstrap", userId: user.id };
+
+  if (organization.is_demo || organization.onboarding_completed_at || organization.slug === "urbanstay-pg") {
+    return { status: "ready", userId: user.id };
+  }
+
+  return { status: "needs_onboarding", userId: user.id };
+}
+
 export async function getAuthUser(): Promise<AuthUser | null> {
   const supabase = await createClient();
   const {
