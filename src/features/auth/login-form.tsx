@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,10 +12,12 @@ import { Building2 } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const demoUnavailable = searchParams.get("error") === "demo";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +53,7 @@ export function LoginForm() {
             <Input
               id="email"
               type="email"
-              placeholder="owner@demo-hostel.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -70,15 +73,31 @@ export function LoginForm() {
           {error && (
             <p className="text-sm text-destructive" role="alert">{error}</p>
           )}
+          {demoUnavailable && (
+            <p className="text-sm text-destructive" role="alert">
+              Demo is temporarily unavailable. Please try again.
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
         </form>
-        <div className="mt-6 rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground mb-2">Demo credentials</p>
-          <p>Owner: owner@demo-hostel.com</p>
-          <p>Manager: manager@demo-hostel.com</p>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
         </div>
+
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/demo">Explore Demo Dashboard</Link>
+        </Button>
+        <p className="mt-3 text-center text-sm text-muted-foreground">
+          Explore the product using sample hostel data.
+        </p>
       </CardContent>
     </Card>
   );

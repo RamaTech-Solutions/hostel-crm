@@ -12,8 +12,8 @@ test.describe("PG CRM", () => {
     await expect(page).toHaveURL(/login/);
   });
 
-  test("shows demo credentials hint", async ({ page }) => {
+  test("shows demo dashboard link", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByText("owner@demo-hostel.com")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Explore Demo Dashboard/i })).toBeVisible();
   });
 });
