@@ -19,7 +19,7 @@ export default async function SearchPage({
   return (
     <div>
       <Breadcrumbs items={[{ label: "Search" }]} />
-      <h1 className="text-2xl font-bold mb-2">Search Results</h1>
+      <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Search</h1>
       {q && <p className="text-muted-foreground mb-6">Showing results for &quot;{q}&quot;</p>}
 
       {!q ? (

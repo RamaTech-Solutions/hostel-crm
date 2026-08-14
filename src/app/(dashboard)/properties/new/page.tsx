@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthUser, isOwner } from "@/lib/auth/get-user";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PropertyForm } from "@/features/properties/property-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function NewPropertyPage() {
   const user = await getAuthUser();
@@ -11,7 +12,7 @@ export default async function NewPropertyPage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: "Properties", href: "/properties" }, { label: "New Property" }]} />
-      <h1 className="text-2xl font-bold mb-6">Add Property</h1>
+      <PageHeader title="Add Property" description="Required details only. You can add rooms after saving." />
       <PropertyForm />
     </div>
   );

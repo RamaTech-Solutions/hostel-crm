@@ -4,6 +4,10 @@ import { getAllBeds } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BedStatusBadge } from "@/components/ui/status-badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import type { BedStatus } from "@/types/database";
 
 export default async function RoomsPage() {
@@ -11,6 +15,8 @@ export default async function RoomsPage() {
   if (!user) redirect("/login");
 
   const beds = await getAllBeds(user);
+  const vacant = beds.filter((b) => b.status === "available").length;
+  const occupied = beds.filter((b) => b.status === "occupied").length;
 
   const grouped = beds.reduce((acc, bed) => {
     const propName = bed.property?.name ?? "Unknown";
@@ -24,29 +30,39 @@ export default async function RoomsPage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: "Rooms & Beds" }]} />
-      <h1 className="text-2xl font-bold mb-2">Rooms & Beds</h1>
-      <p className="text-muted-foreground mb-6">
-        {beds.filter((b) => b.status === "available").length} available · {beds.filter((b) => b.status === "occupied").length} occupied
-      </p>
+      <PageHeader
+        title="Rooms & Beds"
+        description={`${vacant} vacant · ${occupied} occupied`}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {Object.values(grouped).map((group) => (
-          <Card key={`${group.property}-${group.room}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{group.property}</CardTitle>
-              <p className="text-sm text-muted-foreground">Room {group.room}</p>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {group.beds.map((bed) => (
-                <div key={bed.id} className="flex items-center justify-between rounded border p-2">
-                  <span className="text-sm font-medium">Bed {bed.bed_label}</span>
-                  <BedStatusBadge status={bed.status as BedStatus} />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {beds.length === 0 ? (
+        <EmptyState
+          title="No rooms yet"
+          description="Add rooms on a property so you can assign beds and track occupancy."
+          action={
+            <Button asChild><Link href="/properties">Go to Properties</Link></Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Object.values(grouped).map((group) => (
+            <Card key={`${group.property}-${group.room}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{group.property}</CardTitle>
+                <p className="text-sm text-muted-foreground">Room {group.room}</p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {group.beds.map((bed) => (
+                  <div key={bed.id} className="flex items-center justify-between rounded-md border p-2">
+                    <span className="text-sm font-medium">Bed {bed.bed_label}</span>
+                    <BedStatusBadge status={bed.status as BedStatus} />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { BedStatusBadge } from "@/components/ui/status-badge";
 import { BedDouble, DoorOpen, Users, IndianRupee, Plus } from "lucide-react";
 import { RoomForm } from "@/features/properties/room-form";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { BedStatus } from "@/types/database";
 
 export default async function PropertyDetailPage({
@@ -39,7 +40,7 @@ export default async function PropertyDetailPage({
       />
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{property.name}</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">{property.name}</h1>
         <p className="text-muted-foreground">
           {property.address_line}, {property.city}, {property.state} — {property.pincode}
         </p>
@@ -69,7 +70,11 @@ export default async function PropertyDetailPage({
           </div>
 
           {rooms.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-muted-foreground">No rooms yet. Add your first room.</CardContent></Card>
+            <Card>
+              <CardContent className="py-8">
+                <EmptyState title="No rooms yet" description="Add your first room so you can assign beds." />
+              </CardContent>
+            </Card>
           ) : (
             rooms.map((room) => (
               <Card key={room.id}>
@@ -87,8 +92,10 @@ export default async function PropertyDetailPage({
                         <div
                           key={bed.id}
                           className={`rounded-lg border p-3 ${
-                            bed.status === "available" ? "border-green-200 bg-green-50" :
-                            bed.status === "occupied" ? "border-blue-200 bg-blue-50" : "border-gray-200"
+                            bed.status === "occupied" ? "border-success/30 bg-success/10" :
+                            bed.status === "available" ? "border-primary/30 bg-primary/10" :
+                            bed.status === "reserved" ? "border-warning/30 bg-warning/10" :
+                            "border-border bg-muted"
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
@@ -96,7 +103,7 @@ export default async function PropertyDetailPage({
                             <BedStatusBadge status={bed.status as BedStatus} />
                           </div>
                           {resident ? (
-                            <Link href={`/residents/${resident.id}`} className="text-sm text-primary hover:underline">
+                            <Link href={`/residents/${resident.id}`} className="text-sm font-medium underline-offset-4 hover:underline">
                               {resident.full_name}
                             </Link>
                           ) : (

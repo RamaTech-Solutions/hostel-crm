@@ -29,7 +29,7 @@ export default async function TransferPage({
         { label: resident.full_name, href: `/residents/${residentId}` },
         { label: "Transfer" },
       ]} />
-      <h1 className="text-2xl font-bold mb-6">Move Resident — {resident.full_name}</h1>
+      <h1 className="mb-6 text-[32px] font-semibold leading-10 tracking-tight">Move Resident — {resident.full_name}</h1>
       <TransferForm
         residentId={residentId}
         properties={properties}

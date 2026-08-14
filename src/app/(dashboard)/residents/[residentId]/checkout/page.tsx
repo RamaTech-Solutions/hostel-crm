@@ -25,7 +25,7 @@ export default async function CheckoutPage({
         { label: resident.full_name, href: `/residents/${residentId}` },
         { label: "Checkout" },
       ]} />
-      <h1 className="text-2xl font-bold mb-6">Checkout — {resident.full_name}</h1>
+      <h1 className="mb-6 text-[32px] font-semibold leading-10 tracking-tight">Checkout — {resident.full_name}</h1>
       <CheckoutForm residentId={residentId} depositAmount={Number(resident.security_deposit_amount)} />
     </div>
   );

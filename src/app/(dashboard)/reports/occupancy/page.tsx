@@ -15,10 +15,10 @@ export default async function OccupancyReportPage() {
     <div>
       <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Occupancy" }]} />
       <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">Occupancy Report</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Occupancy</h1>
         <Button asChild variant="outline" size="sm"><Link href="/api/export/occupancy">Export CSV</Link></Button>
       </div>
-      <div className="rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-sm">
           <thead><tr className="border-b bg-muted/50">
             <th className="px-4 py-3 text-left">Property</th>

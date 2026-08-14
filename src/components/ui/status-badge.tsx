@@ -2,8 +2,8 @@ import type { BedStatus, ResidentStatus, PaymentStatus } from "@/types/database"
 import { Badge } from "@/components/ui/badge";
 
 const bedStatusConfig: Record<BedStatus, { label: string; variant: "success" | "default" | "warning" | "secondary" }> = {
-  available: { label: "Available", variant: "success" },
-  occupied: { label: "Occupied", variant: "default" },
+  available: { label: "Vacant", variant: "default" },
+  occupied: { label: "Occupied", variant: "success" },
   reserved: { label: "Reserved", variant: "warning" },
   maintenance: { label: "Maintenance", variant: "secondary" },
 };
@@ -35,4 +35,14 @@ export function ResidentStatusBadge({ status }: { status: ResidentStatus }) {
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const config = paymentStatusConfig[status] ?? { label: status, variant: "secondary" as const };
   return <Badge variant={config.variant}>{config.label}</Badge>;
+}
+
+export function StatusBadge({
+  status,
+}: {
+  status: "paid" | "overdue" | "partial" | "pending" | "occupied" | "vacant";
+}) {
+  if (status === "occupied") return <BedStatusBadge status="occupied" />;
+  if (status === "vacant") return <BedStatusBadge status="available" />;
+  return <PaymentStatusBadge status={status} />;
 }

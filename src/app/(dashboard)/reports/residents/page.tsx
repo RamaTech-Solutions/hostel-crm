@@ -16,10 +16,10 @@ export default async function ResidentsReportPage() {
     <div>
       <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Residents" }]} />
       <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">Active Residents Report</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Active residents</h1>
         <Button asChild variant="outline" size="sm"><Link href="/api/export/residents">Export CSV</Link></Button>
       </div>
-      <div className="rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-sm">
           <thead><tr className="border-b bg-muted/50">
             <th className="px-4 py-3 text-left">Name</th>

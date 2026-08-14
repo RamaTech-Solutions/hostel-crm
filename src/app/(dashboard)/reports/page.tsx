@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileBarChart, Download } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const reports = [
   { href: "/reports/occupancy", title: "Occupancy Report", desc: "Property-wise bed occupancy rates" },
@@ -20,7 +21,7 @@ export default async function ReportsPage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: "Reports" }]} />
-      <h1 className="text-2xl font-bold mb-6">Reports</h1>
+      <PageHeader title="Reports" description="Export occupancy, residents, payments and vacant beds." />
       <div className="grid gap-4 md:grid-cols-2">
         {reports.map((r) => (
           <Card key={r.href}>

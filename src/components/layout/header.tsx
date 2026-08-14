@@ -8,13 +8,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 import { signOut } from "@/lib/actions";
 import { useState } from "react";
+import { SidebarMenuButton } from "@/components/layout/sidebar";
 
 interface HeaderProps {
   userName: string;
   notificationCount?: number;
+  onMenuClick: () => void;
 }
 
-export function Header({ userName, notificationCount = 0 }: HeaderProps) {
+export function Header({ userName, notificationCount = 0, onMenuClick }: HeaderProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
 
@@ -26,23 +28,26 @@ export function Header({ userName, notificationCount = 0 }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-4 pl-16 backdrop-blur lg:pl-6">
-      <form onSubmit={handleSearch} className="relative w-full max-w-md">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
+      <SidebarMenuButton onClick={onMenuClick} />
+
+      <form onSubmit={handleSearch} className="relative min-w-0 flex-1 max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search residents, mobile, room..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search"
         />
       </form>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="icon" className="relative" asChild>
           <a href="/dashboard#alerts" aria-label="Notifications">
             <Bell className="h-5 w-5" />
             {notificationCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
                 {notificationCount > 9 ? "9+" : notificationCount}
               </span>
             )}
@@ -55,7 +60,7 @@ export function Header({ userName, notificationCount = 0 }: HeaderProps) {
               {getInitials(userName)}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium">{userName}</span>
+          <span className="max-w-[140px] truncate text-sm font-medium">{userName}</span>
         </div>
 
         <form action={signOut}>
