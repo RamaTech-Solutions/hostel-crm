@@ -10,7 +10,7 @@ test.describe("Awaasly", () => {
 
   test("login page loads", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome back/i })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
   });
 
@@ -21,7 +21,7 @@ test.describe("Awaasly", () => {
 
   test("shows demo dashboard link", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("link", { name: /Explore Demo Dashboard/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Explore Demo/i })).toBeVisible();
   });
 
   test("signup page uses Awaasly branding", async ({ page }) => {

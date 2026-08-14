@@ -18,10 +18,10 @@ export default async function PaymentsReportPage() {
     <div>
       <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Payments" }]} />
       <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">Payment Report</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Payments</h1>
         <Button asChild variant="outline" size="sm"><Link href="/api/export/payments">Export CSV</Link></Button>
       </div>
-      <div className="rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-sm">
           <thead><tr className="border-b bg-muted/50">
             <th className="px-4 py-3 text-left">Date</th>

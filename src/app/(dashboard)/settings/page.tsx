@@ -4,6 +4,7 @@ import { getTeamMembers } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function SettingsPage() {
   const user = await getAuthUser();
@@ -14,7 +15,7 @@ export default async function SettingsPage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: "Settings" }]} />
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <PageHeader title="Settings" description="Workspace profile and team. Role permissions stay as they are." />
 
       <div className="grid gap-6 max-w-2xl">
         <Card>
@@ -31,8 +32,8 @@ export default async function SettingsPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">Team Members</CardTitle></CardHeader>
             <CardContent>
-              {team.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No team members</p>
+      {team.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No team members yet. Managers and viewers appear here when they are added.</p>
               ) : (
                 <div className="space-y-3">
                   {team.map((member) => (

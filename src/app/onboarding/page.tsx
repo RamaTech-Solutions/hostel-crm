@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getTenantGate } from "@/lib/auth/get-user";
 import { getFloors, getProperties } from "@/lib/queries";
 import { OnboardingWizard } from "@/features/onboarding/onboarding-wizard";
+import { AwaaslyLogo } from "@/components/brand/awaasly-logo";
 
 export default async function OnboardingPage() {
   const gate = await getTenantGate();
@@ -30,11 +31,10 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-4">
-      <div className="w-full max-w-lg space-y-4">
+    <div className="flex min-h-screen items-start justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Awaasly</h1>
-          <p className="text-sm text-muted-foreground">Run every property from one place.</p>
+          <AwaaslyLogo showTagline />
         </div>
         <OnboardingWizard
           needsBootstrap={gate.status === "needs_bootstrap"}

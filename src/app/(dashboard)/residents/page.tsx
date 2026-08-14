@@ -4,7 +4,6 @@ import { getAuthUser, canWrite } from "@/lib/auth/get-user";
 import { getResidents, getProperties } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ResidentStatusBadge } from "@/components/ui/status-badge";
 import { Plus } from "lucide-react";
@@ -13,6 +12,9 @@ import { Suspense } from "react";
 import { ResidentsFilters } from "@/features/residents/residents-filters";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ResidentStatus } from "@/types/database";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { DataTable, DataTableHead, DataTh, DataTableBody, DataTr, DataTd } from "@/components/ui/data-table";
 
 export default async function ResidentsPage({
   searchParams,
@@ -35,44 +37,45 @@ export default async function ResidentsPage({
   return (
     <div>
       <Breadcrumbs items={[{ label: "Residents" }]} />
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Residents</h1>
-          <p className="text-muted-foreground">{residents.length} residents found</p>
-        </div>
-        {canWrite(user) && (
-          <Button asChild>
-            <Link href="/residents/new"><Plus className="h-4 w-4 mr-2" />Add Resident</Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Residents"
+        description={`${residents.length} residents`}
+        actions={
+          canWrite(user) ? (
+            <Button asChild>
+              <Link href="/residents/new"><Plus className="h-4 w-4" />Add Resident</Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      <Suspense fallback={<Skeleton className="h-10 w-full max-w-xl" />}>
+      <Suspense fallback={<Skeleton className="mb-4 h-10 w-full max-w-xl" />}>
         <ResidentsFilters properties={properties} />
       </Suspense>
 
       {residents.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No residents found. {canWrite(user) && "Start by onboarding a new resident."}
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No residents yet"
+          description="Add your first resident to start tracking occupancy and rent."
+          action={
+            canWrite(user) ? (
+              <Button asChild><Link href="/residents/new">Add Resident</Link></Button>
+            ) : null
+          }
+        />
       ) : (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Resident</th>
-                  <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Mobile</th>
-                  <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">Property</th>
-                  <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">Room / Bed</th>
-                  <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Joining</th>
-                  <th className="px-4 py-3 text-left font-medium">Rent</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
+        <>
+          <div className="hidden md:block">
+            <DataTable>
+              <DataTableHead>
+                <DataTh>Resident</DataTh>
+                <DataTh className="hidden lg:table-cell">Property</DataTh>
+                <DataTh className="hidden lg:table-cell">Room / Bed</DataTh>
+                <DataTh>Rent</DataTh>
+                <DataTh>Status</DataTh>
+                <DataTh className="hidden lg:table-cell">Joining</DataTh>
+              </DataTableHead>
+              <DataTableBody>
                 {residents.map((resident) => {
                   const assignment = resident.bed_assignment as {
                     bed?: { bed_label: string };
@@ -80,8 +83,8 @@ export default async function ResidentsPage({
                   } | null;
                   const property = resident.property as { name: string } | null;
                   return (
-                    <tr key={resident.id} className="border-b hover:bg-muted/30">
-                      <td className="px-4 py-3">
+                    <DataTr key={resident.id}>
+                      <DataTd>
                         <Link href={`/residents/${resident.id}`} className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
                             {resident.photo_url && <AvatarImage src={resident.photo_url} />}
@@ -92,24 +95,48 @@ export default async function ResidentsPage({
                             <p className="text-xs text-muted-foreground">{maskIdNumber(resident.id_number_masked)}</p>
                           </div>
                         </Link>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">{resident.mobile}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell">{property?.name ?? "—"}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
+                      </DataTd>
+                      <DataTd className="hidden lg:table-cell">{property?.name ?? "—"}</DataTd>
+                      <DataTd className="hidden lg:table-cell">
                         {assignment?.room ? `${assignment.room.room_number}-${assignment.bed?.bed_label}` : "—"}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">{formatDate(resident.joining_date)}</td>
-                      <td className="px-4 py-3">{formatCurrency(Number(resident.monthly_rent))}</td>
-                      <td className="px-4 py-3">
+                      </DataTd>
+                      <DataTd>{formatCurrency(Number(resident.monthly_rent))}</DataTd>
+                      <DataTd>
                         <ResidentStatusBadge status={resident.status as ResidentStatus} />
-                      </td>
-                    </tr>
+                      </DataTd>
+                      <DataTd className="hidden lg:table-cell">{formatDate(resident.joining_date)}</DataTd>
+                    </DataTr>
                   );
                 })}
-              </tbody>
-            </table>
+              </DataTableBody>
+            </DataTable>
           </div>
-        </div>
+
+          <div className="space-y-3 md:hidden">
+            {residents.map((resident) => {
+              const assignment = resident.bed_assignment as {
+                bed?: { bed_label: string };
+                room?: { room_number: string };
+              } | null;
+              const property = resident.property as { name: string } | null;
+              return (
+                <Link key={resident.id} href={`/residents/${resident.id}`} className="block rounded-lg border bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{resident.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{property?.name ?? "—"}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {assignment?.room ? `${assignment.room.room_number}-${assignment.bed?.bed_label}` : "No bed"}
+                      </p>
+                    </div>
+                    <ResidentStatusBadge status={resident.status as ResidentStatus} />
+                  </div>
+                  <p className="mt-3 text-sm font-medium">{formatCurrency(Number(resident.monthly_rent))}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

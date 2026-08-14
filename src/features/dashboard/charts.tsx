@@ -14,7 +14,7 @@ export function OccupancyChart({ data }: OccupancyChartProps) {
         <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-15} textAnchor="end" height={60} />
         <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} unit="%" />
         <Tooltip formatter={(value) => [`${value}%`, "Occupancy"]} />
-        <Bar dataKey="occupancy" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="occupancy" fill="#2F6B4F" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -27,8 +27,8 @@ interface RentChartProps {
 
 export function RentCollectionChart({ collected, pending }: RentChartProps) {
   const data = [
-    { name: "Collected", value: collected, color: "hsl(142, 76%, 36%)" },
-    { name: "Pending", value: pending, color: "hsl(38, 92%, 50%)" },
+    { name: "Collected", value: collected, color: "#2F6B4F" },
+    { name: "Pending", value: pending, color: "#D97736" },
   ];
 
   return (

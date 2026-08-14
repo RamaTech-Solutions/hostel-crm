@@ -63,7 +63,7 @@ export default async function ResidentProfilePage({
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">{resident.full_name}</h1>
+              <h1 className="text-[32px] font-semibold leading-10 tracking-tight">{resident.full_name}</h1>
               <ResidentStatusBadge status={resident.status as ResidentStatus} />
             </div>
             <p className="text-muted-foreground">{formatMobile(resident.mobile)}</p>
@@ -193,7 +193,7 @@ export default async function ResidentProfilePage({
             <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
             <CardContent>
               {documents.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No documents uploaded</p>
+                <p className="text-sm leading-[22px] text-muted-foreground">No documents yet. Upload Aadhaar or other records to keep them with this resident.</p>
               ) : (
                 <div className="space-y-2">
                   {documents.map((doc) => (
@@ -204,7 +204,7 @@ export default async function ResidentProfilePage({
                       </div>
                       <a
                         href={`/api/documents/${doc.id}/signed-url`}
-                        className="text-sm text-primary hover:underline"
+                        className="text-sm font-medium underline-offset-4 hover:underline"
                         target="_blank"
                         rel="noopener noreferrer"
                       >

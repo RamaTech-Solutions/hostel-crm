@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OnboardingProgress } from "@/components/ui/onboarding-progress";
 import type { Floor, Property } from "@/types/database";
 
 const STEPS = ["Business", "Property", "Structure", "Rooms & Beds", "Complete"] as const;
@@ -138,21 +139,19 @@ export function OnboardingWizard({
   return (
     <Card className="w-full max-w-lg">
       <CardHeader>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {STEPS[stepIndex]} · {stepIndex + 1} of {STEPS.length}
-        </p>
+        <OnboardingProgress steps={STEPS} currentIndex={stepIndex} />
         <CardTitle>
           {step === "business" && "Welcome to Awaasly"}
           {step === "property" && "Add your first property"}
-          {step === "structure" && "Property structure"}
+          {step === "structure" && "How this building is structured"}
           {step === "rooms" && "Rooms & beds"}
-          {step === "finish" && "Your Awaasly workspace is ready"}
+          {step === "finish" && "Your Awaasly workspace is ready."}
         </CardTitle>
         <CardDescription>
-          {step === "business" && "Let's set up your PG business."}
-          {step === "property" && "You need at least one property before using the dashboard."}
-          {step === "structure" && "Tell us how many floors this building has."}
-          {step === "rooms" && "Add rooms now, or finish this later from the dashboard."}
+          {step === "business" && "Required so we can name your workspace. You can change this later in Settings."}
+          {step === "property" && "Required. Occupancy and rent tracking start from at least one property."}
+          {step === "structure" && "Required. Floors help you place rooms correctly. You can rename them later."}
+          {step === "rooms" && "Optional. Add one room now, or finish this later from the dashboard."}
           {step === "finish" && "You can add residents next and start daily operations."}
         </CardDescription>
       </CardHeader>
@@ -190,7 +189,7 @@ export function OnboardingWizard({
               <select
                 id="property_type"
                 name="property_type"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
                 defaultValue="Mixed PG"
               >
                 {PROPERTY_TYPES.map((type) => (
@@ -258,7 +257,7 @@ export function OnboardingWizard({
               <select
                 id="floor_id"
                 name="floor_id"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
               >
                 {floors.map((floor) => (
                   <option key={floor.id} value={floor.id}>{floor.label}</option>
@@ -275,7 +274,7 @@ export function OnboardingWizard({
                 id="room_type"
                 name="room_type"
                 defaultValue="double"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
               >
                 <option value="single">Single</option>
                 <option value="double">Double</option>

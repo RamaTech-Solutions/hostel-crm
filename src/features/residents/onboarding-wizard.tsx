@@ -112,7 +112,7 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
       <Card className="max-w-lg mx-auto text-center">
         <CardContent className="py-12">
           <CheckCircle2 className="h-16 w-16 text-success mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Resident Successfully Onboarded</h2>
+          <h2 className="mb-2 text-xl font-semibold">Resident added</h2>
           <p className="text-muted-foreground mb-6">{form.full_name} has been added to the system.</p>
           <div className="flex gap-3 justify-center">
             {residentId && (
@@ -134,11 +134,9 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span>Step {step + 1} of {STEPS.length}</span>
-          <span className="text-muted-foreground">{STEPS[step]}</span>
-        </div>
-        <Progress value={((step + 1) / STEPS.length) * 100} />
+        <p className="text-xs font-medium text-muted-foreground">Step {step + 1} of {STEPS.length}</p>
+        <p className="mt-1 text-xl font-semibold leading-7">{STEPS[step]}</p>
+        <Progress value={((step + 1) / STEPS.length) * 100} className="mt-3" />
       </div>
 
       <Card>
@@ -274,7 +272,7 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
           <div className="flex justify-between pt-4">
             <Button variant="outline" onClick={handleBack} disabled={step === 0}>Back</Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={handleNext}>Next</Button>
+              <Button onClick={handleNext}>Continue</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={loading}>{loading ? "Confirming..." : "Confirm & Onboard"}</Button>
             )}

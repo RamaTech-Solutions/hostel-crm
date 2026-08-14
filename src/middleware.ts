@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/setup",
   "/demo",
+  "/robots.txt",
+  "/sitemap.xml",
 ];
 
 function isPublicPath(pathname: string) {
