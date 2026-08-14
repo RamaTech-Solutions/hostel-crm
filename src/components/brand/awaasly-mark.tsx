@@ -1,5 +1,16 @@
 import { cn } from "@/lib/utils";
 
+/** Canonical modular-A paths. Keep identical in public/brand and app/icon.svg. */
+export const AWAASLY_MARK_VIEWBOX = "0 0 56 72";
+
+export const AWAASLY_MARK_PATHS = [
+  "M28 .5c.6 0 1.2.3 1.5.8l8.2 12.2c.5.8 0 1.8-.9 1.8H19.2c-.9 0-1.4-1-.9-1.8L26.5 1.3C26.8.8 27.4.5 28 .5Z",
+  "M9.2 17.2c.2-.7.8-1.1 1.5-1.1h14.6c.8 0 1.4.6 1.4 1.4v17.2c0 .8-.6 1.4-1.4 1.4H7.8c-.9 0-1.5-.8-1.3-1.6l2.7-17.3Z",
+  "M29.3 16.1c-.8 0-1.4.6-1.4 1.4v17.2c0 .8.6 1.4 1.4 1.4h16.8c.9 0 1.5-.8 1.3-1.6l-2.7-17.3c-.2-.7-.8-1.1-1.5-1.1H29.3Zm8.8 7.4c-2.3 0-3.8 1.6-3.8 4.2 0 .8.2 1.5.6 2 .6.8 1.5 1.2 3.2 1.2s2.6-.4 3.2-1.2c.4-.5.6-1.2.6-2 0-2.6-1.5-4.2-3.8-4.2Z",
+  "M5.8 39.6c.2-.7.8-1.2 1.5-1.2h17.9c.8 0 1.4.6 1.4 1.4v18.4c0 .8-.6 1.4-1.4 1.4H1.8c-.9 0-1.5-.8-1.3-1.7l5.3-18.3Z",
+  "M30.8 38.4c0-.8.6-1.4 1.4-1.4h17.9c.7 0 1.3.5 1.5 1.2l5.3 18.3c.2.9-.4 1.7-1.3 1.7H32.2c-.8 0-1.4-.6-1.4-1.4V38.4Z",
+] as const;
+
 export function AwaaslyMark({
   className,
   fill = "currentColor",
@@ -11,35 +22,17 @@ export function AwaaslyMark({
 }) {
   return (
     <svg
-      viewBox="0 0 80 96"
+      viewBox={AWAASLY_MARK_VIEWBOX}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("shrink-0", className)}
+      className={cn("h-auto w-auto shrink-0", className)}
       role="img"
       aria-label={title}
     >
       <title>{title}</title>
-      <path
-        fill={fill}
-        d="M40 4.5c1.1 0 2.1.5 2.8 1.4l18.2 24.2c.9 1.2.1 2.9-1.4 2.9H20.4c-1.5 0-2.3-1.7-1.4-2.9L37.2 5.9A3.5 3.5 0 0 1 40 4.5Z"
-      />
-      <path
-        fill={fill}
-        d="M11.5 35.2c0-1.3 1-2.4 2.3-2.4h22.4c1.3 0 2.3 1.1 2.3 2.4V55c0 1.3-1 2.4-2.3 2.4H13.8c-1.3 0-2.3-1.1-2.3-2.4V35.2Z"
-      />
-      <path
-        fill={fill}
-        fillRule="evenodd"
-        d="M43.5 32.8c-1.3 0-2.3 1.1-2.3 2.4V55c0 1.3 1 2.4 2.3 2.4h22.7c1.3 0 2.3-1.1 2.3-2.4V35.2c0-1.3-1-2.4-2.3-2.4H43.5Zm11.4 8.4c-3.1 0-5.2 2.2-5.2 5.6 0 1.2.3 2.1.8 2.8.8 1.1 2.1 1.7 4.4 1.7s3.6-.6 4.4-1.7c.5-.7.8-1.6.8-2.8 0-3.4-2.1-5.6-5.2-5.6Z"
-      />
-      <path
-        fill={fill}
-        d="M10.2 62.2c0-1.2 1-2.2 2.2-2.2h22.1c1.1 0 2 .8 2.2 1.9l4.1 24.2c.2 1.3-.8 2.5-2.1 2.5H16.8c-1.1 0-2-.8-2.2-1.9L10.3 64.3a2.2 2.2 0 0 1-.1-2.1Z"
-      />
-      <path
-        fill={fill}
-        d="M45.3 61.9c.2-1.1 1.1-1.9 2.2-1.9h22.1c1.2 0 2.2 1 2.2 2.2 0 .7 0 1.4-.1 2.1l-4.3 22.6c-.2 1.1-1.1 1.9-2.2 1.9H43.3c-1.3 0-2.3-1.2-2.1-2.5l4.1-24.4Z"
-      />
+      {AWAASLY_MARK_PATHS.map((d) => (
+        <path key={d} fill={fill} fillRule="evenodd" d={d} />
+      ))}
     </svg>
   );
 }

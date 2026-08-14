@@ -2,9 +2,9 @@ import { cn } from "@/lib/utils";
 import { AwaaslyMark } from "@/components/brand/awaasly-mark";
 
 const sizes = {
-  sm: { mark: "h-7 w-6", word: "text-base", tag: "text-[10px]", gap: "gap-2" },
-  md: { mark: "h-9 w-8", word: "text-xl", tag: "text-xs", gap: "gap-2.5" },
-  lg: { mark: "h-12 w-10", word: "text-2xl", tag: "text-sm", gap: "gap-3" },
+  sm: { mark: "h-[28px] w-auto translate-y-px", word: "text-[17px] leading-none", tag: "text-[10px] leading-tight", gap: "gap-2.5" },
+  md: { mark: "h-9 w-auto translate-y-px", word: "text-xl leading-none", tag: "text-xs", gap: "gap-2.5" },
+  lg: { mark: "h-12 w-auto", word: "text-2xl leading-none", tag: "text-sm", gap: "gap-3" },
 } as const;
 
 type LogoVariant = "primary" | "reversed" | "monoDark" | "monoLight" | "icon" | "stacked";
@@ -23,7 +23,7 @@ const wordClass: Record<LogoVariant, string> = {
   primary: "text-foreground",
   reversed: "text-sidebar-foreground",
   monoDark: "text-foreground",
-  monoLight: "text-background",
+  monoLight: "text-[#FFF9EC]",
   icon: "text-foreground",
   stacked: "text-foreground",
 };
@@ -47,10 +47,10 @@ export function AwaaslyLogo({
   }
 
   const wordmark = (
-    <span className="flex min-w-0 flex-col">
+    <span className="flex min-w-0 flex-col justify-center">
       <span className={cn("font-semibold tracking-tight", s.word, wordClass[variant])}>Awaasly</span>
       {showTagline ? (
-        <span className={cn("font-normal text-muted-foreground", s.tag)}>Every property. One place.</span>
+        <span className={cn("mt-0.5 font-normal text-muted-foreground", s.tag)}>Every property. One place.</span>
       ) : null}
     </span>
   );

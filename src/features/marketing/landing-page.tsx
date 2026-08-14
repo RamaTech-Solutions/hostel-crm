@@ -28,7 +28,7 @@ function ProductPreview() {
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <p className="border-b bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
-        Product preview — illustration of the Awaasly workspace, not live account data
+        Awaasly workspace preview
       </p>
       <div className="grid min-h-[280px] md:grid-cols-[180px_1fr]">
         <div className="hidden bg-sidebar p-4 md:block">
