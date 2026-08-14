@@ -1,9 +1,16 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("PG CRM", () => {
+test.describe("Awaasly", () => {
+  test("landing page is public", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Run all your PGs from one place/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Start Free/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Explore Demo/i }).first()).toBeVisible();
+  });
+
   test("login page loads", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: /PG Management CRM/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
   });
 
@@ -20,7 +27,7 @@ test.describe("PG CRM", () => {
   test("signup page uses Awaasly branding", async ({ page }) => {
     await page.goto("/signup");
     await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
-    await expect(page.getByLabel("Your name")).toBeVisible();
-    await expect(page.getByLabel("Business / PG name")).toBeVisible();
+    await expect(page.getByLabel("Full Name")).toBeVisible();
+    await expect(page.getByLabel("Business / PG Name")).toBeVisible();
   });
 });

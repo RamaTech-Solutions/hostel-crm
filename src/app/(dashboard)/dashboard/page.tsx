@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { FirstRunChecklist } from "@/features/dashboard/first-run-checklist";
 
 export default async function DashboardPage() {
   const user = await getAuthUser();
@@ -50,6 +51,10 @@ export default async function DashboardPage() {
             : "Overview of your assigned properties"}
         </p>
       </div>
+
+      {user.role === "owner" && stats.activeResidents === 0 && stats.totalProperties > 0 && (
+        <FirstRunChecklist stats={stats} />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard title="Total Properties" value={stats.totalProperties} icon={Building2} />

@@ -21,7 +21,8 @@ describe("signup schema", () => {
       organization_name: "Test PG",
       email: "owner@example.com",
       password: "password1",
-      phone: "",
+      confirm_password: "password1",
+      phone: "9876543210",
     });
     expect(result.success).toBe(true);
   });
