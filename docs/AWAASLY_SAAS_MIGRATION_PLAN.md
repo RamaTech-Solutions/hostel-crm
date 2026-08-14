@@ -34,6 +34,7 @@
 | 20260814120500 | protect_history | RESTRICT on assignment/payment property FKs |
 | 20260814120600 | org_saas_fields | `is_demo`, `onboarding_completed_at` |
 | 20260814120700 | signup_org_bootstrap | `bootstrap_organization` RPC |
+| 20260814120800 | fix_properties_select_insert | Owner SELECT by org+role so INSERT…RETURNING works |
 
 ## Rollback
 
