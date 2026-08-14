@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PG Management CRM
 
-## Getting Started
+Multi-property Hostel / PG Management demo built with Next.js 15, Supabase, and Tailwind CSS.
 
-First, run the development server:
+## Quick Start (Localhost)
+
+### 1. Install dependencies
+
+```bash
+cd pg-crm
+npm install
+```
+
+### 2. Set up Supabase
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Copy `.env.example` to `.env.local` and fill in your keys
+3. Run migrations in Supabase SQL Editor:
+   - `supabase/migrations/001_initial_schema.sql`
+   - `supabase/migrations/002_rls_policies.sql`
+4. Create Storage bucket `resident-documents` (private)
+5. Add Auth redirect URLs: `http://localhost:3000/**`
+
+### 3. Seed demo data
+
+```bash
+npm run seed
+```
+
+### 4. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Demo login:** `owner@demo-hostel.com` / `Demo@12345`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy to Vercel
 
-## Learn More
+1. Push to GitHub
+2. Import in Vercel
+3. Set environment variables (same as `.env.local`)
+4. Add production URL to Supabase Auth redirect URLs
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run seed` | Seed demo data |
+| `npm test` | Run unit tests |
+| `npm run test:e2e` | Run Playwright E2E |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+- **Frontend:** Next.js 15 App Router, TypeScript, Tailwind, shadcn-style UI
+- **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS)
+- **Auth:** Email/password via Supabase Auth with middleware session refresh
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Roles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Role | Access |
+|------|--------|
+| Owner | All properties, full CRUD, team management |
+| Property Admin | Assigned properties only |
+| Viewer | Read-only on assigned properties |

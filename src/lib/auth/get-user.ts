@@ -1,0 +1,73 @@
+import "server-only";
+import { createClient } from "@/lib/supabase/server";
+import type { AuthUser, UserRole } from "@/types/database";
+
+export async function getAuthUser(): Promise<AuthUser | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) return null;
+
+  const { data: roleRecord } = await supabase
+    .from("user_roles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", profile.organization_id)
+    .single();
+
+  if (!organization) return null;
+
+  let assignedPropertyIds: string[] = [];
+  if (roleRecord?.role === "property_admin" || roleRecord?.role === "viewer") {
+    const { data: assignments } = await supabase
+      .from("property_user_assignments")
+      .select("property_id")
+      .eq("user_id", user.id);
+    assignedPropertyIds = assignments?.map((a) => a.property_id) ?? [];
+  }
+
+  return {
+    id: user.id,
+    email: user.email ?? profile.email,
+    profile,
+    role: (roleRecord?.role ?? "viewer") as UserRole,
+    organization,
+    assignedPropertyIds,
+  };
+}
+
+export async function requireAuthUser(): Promise<AuthUser> {
+  const user = await getAuthUser();
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+  return user;
+}
+
+export function canWrite(user: AuthUser): boolean {
+  return user.role === "owner" || user.role === "property_admin";
+}
+
+export function isOwner(user: AuthUser): boolean {
+  return user.role === "owner";
+}
+
+export function canAccessProperty(user: AuthUser, propertyId: string): boolean {
+  if (user.role === "owner") return true;
+  return user.assignedPropertyIds.includes(propertyId);
+}

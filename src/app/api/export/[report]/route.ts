@@ -1,0 +1,89 @@
+import { NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth/get-user";
+import {
+  getOccupancyByProperty,
+  getResidents,
+  getPayments,
+  getAllBeds,
+} from "@/lib/queries";
+
+function toCsv(rows: string[][]): string {
+  return rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ report: string }> }
+) {
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { report } = await params;
+  let csv = "";
+  let filename = "report.csv";
+
+  switch (report) {
+    case "occupancy": {
+      const data = await getOccupancyByProperty(user);
+      csv = toCsv([
+        ["Property", "Occupied", "Total Beds", "Occupancy %"],
+        ...data.map((d) => [d.name, String(d.occupied), String(d.total), String(d.occupancy)]),
+      ]);
+      filename = "occupancy-report.csv";
+      break;
+    }
+    case "residents": {
+      const data = await getResidents(user, { status: "active" });
+      csv = toCsv([
+        ["Name", "Mobile", "Property", "Joining Date", "Monthly Rent"],
+        ...data.map((r) => [
+          r.full_name,
+          r.mobile,
+          (r.property as { name: string })?.name ?? "",
+          r.joining_date,
+          String(r.monthly_rent),
+        ]),
+      ]);
+      filename = "residents-report.csv";
+      break;
+    }
+    case "payments": {
+      const data = await getPayments(user);
+      csv = toCsv([
+        ["Date", "Resident", "Property", "Amount", "Status", "Method"],
+        ...data.map((p) => [
+          p.payment_date,
+          (p.resident as { full_name: string })?.full_name ?? "",
+          (p.property as { name: string })?.name ?? "",
+          String(p.amount),
+          p.status,
+          p.payment_method,
+        ]),
+      ]);
+      filename = "payments-report.csv";
+      break;
+    }
+    case "available-beds": {
+      const data = (await getAllBeds(user)).filter((b) => b.status === "available");
+      csv = toCsv([
+        ["Property", "Room", "Bed"],
+        ...data.map((b) => [
+          (b.property as { name: string })?.name ?? "",
+          (b.room as { room_number: string })?.room_number ?? "",
+          b.bed_label,
+        ]),
+      ]);
+      filename = "available-beds.csv";
+      break;
+    }
+    default:
+      return NextResponse.json({ error: "Unknown report" }, { status: 404 });
+  }
+
+  return new NextResponse(csv, {
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
+}
