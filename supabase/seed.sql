@@ -1,0 +1,1 @@
+-- Optional local seed. Demo data is created by `npm run seed` against a linked project.

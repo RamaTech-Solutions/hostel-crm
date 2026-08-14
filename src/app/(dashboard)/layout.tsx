@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAuthUser } from "@/lib/auth/get-user";
+import { getAuthUser, getTenantGate } from "@/lib/auth/get-user";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { getNotifications } from "@/lib/queries";
@@ -10,8 +10,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const gate = await getTenantGate();
+  if (gate.status === "anonymous") redirect("/login");
+  if (gate.status !== "ready") redirect("/onboarding");
+
   const user = await getAuthUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/onboarding");
 
   const notifications = await getNotifications(user);
 

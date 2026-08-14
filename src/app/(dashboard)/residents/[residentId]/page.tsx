@@ -185,11 +185,7 @@ export default async function ResidentProfilePage({
             <Card>
               <CardHeader><CardTitle className="text-base">Upload Document</CardTitle></CardHeader>
               <CardContent>
-                <DocumentUploadForm
-                  residentId={residentId}
-                  organizationId={user.organization.id}
-                  propertyId={property.id}
-                />
+                <DocumentUploadForm residentId={residentId} />
               </CardContent>
             </Card>
           )}

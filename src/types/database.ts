@@ -47,6 +47,8 @@ export interface Organization {
   logo_url: string | null;
   settings: Json;
   is_active: boolean;
+  is_demo: boolean;
+  onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -344,6 +346,12 @@ export type Database = {
       room_transfers: { Row: RoomTransfer; Insert: Partial<RoomTransfer>; Update: Partial<RoomTransfer> };
       security_deposits: { Row: SecurityDeposit; Insert: Partial<SecurityDeposit>; Update: Partial<SecurityDeposit> };
       property_user_assignments: { Row: { id: string; user_id: string; property_id: string; organization_id: string; created_at: string }; Insert: Record<string, unknown>; Update: Record<string, unknown> };
+    };
+    Functions: {
+      bootstrap_organization: {
+        Args: { p_organization_name: string; p_full_name: string; p_phone?: string | null };
+        Returns: string;
+      };
     };
   };
 };

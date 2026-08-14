@@ -98,6 +98,12 @@ export function LoginForm() {
         <p className="mt-3 text-center text-sm text-muted-foreground">
           Explore the product using sample hostel data.
         </p>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          New to Awaasly?{" "}
+          <Link href="/signup" className="text-primary underline-offset-4 hover:underline">
+            Create an account
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );

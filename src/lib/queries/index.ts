@@ -11,6 +11,7 @@ import type {
   Payment,
   Bed,
   Room,
+  Floor,
   ResidentContact,
   ResidentDocument,
 } from "@/types/database";
@@ -270,6 +271,16 @@ export async function getProperty(propertyId: string): Promise<Property | null> 
     .eq("id", propertyId)
     .single();
   return data as Property | null;
+}
+
+export async function getFloors(propertyId: string): Promise<Floor[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("floors")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("floor_number");
+  return (data ?? []) as Floor[];
 }
 
 export async function getRoomsWithBeds(propertyId: string): Promise<RoomWithBeds[]> {
