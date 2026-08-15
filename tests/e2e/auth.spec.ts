@@ -54,4 +54,9 @@ test.describe("Awaasly", () => {
     await expect(page.getByRole("heading", { name: /Check your email/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /Back to Login/i })).toBeVisible();
   });
+
+  test("onboarding requires auth", async ({ page }) => {
+    await page.goto("/onboarding");
+    await expect(page).toHaveURL(/login/);
+  });
 });

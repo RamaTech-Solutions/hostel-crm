@@ -16,13 +16,19 @@ If email confirmation is on, `/signup/check-email` is shown. The confirmation li
 
 `/onboarding` (owners only, until `organizations.onboarding_completed_at` is set):
 
-1. Business details
-2. First property (required)
-3. Floors
-4. Rooms and beds (optional skip)
-5. Complete → dashboard or add resident
+1. Welcome — owner/business details, then Start Setup
+2. First property (create once, later visits update that same property)
+3. Floors — generate from count, then Add Floor / Rename (count is not silently reduced)
+4. Rooms & beds — add a compact list; Continue requires at least one room; Skip for now is explicit
+5. Finish — server counts, then Go to Dashboard (`/dashboard`) or Add First Resident (`/residents/new`)
 
-Resume is derived from data: no org → business; no property → property; no floors → structure; else rooms/complete. Logging out does not create a second organization or property.
+Progress is persisted in the database at each step. Resume: no org → welcome; no property → property; no floors → floors; otherwise rooms. Logging out does not create a second organization or property.
+
+Skipped rooms: onboarding can complete, but Finish and the dashboard checklist say rooms are incomplete and link to `/rooms`.
+
+After onboarding, owners and property admins manage additional properties, floors, rooms and beds from `/properties` and `/rooms`. Occupancy is based on active bed assignments. See [AWAASLY_INVENTORY.md](./AWAASLY_INVENTORY.md).
+
+Property type is still stored in `properties.notes` (technical debt). Room numbers are unique per property.
 
 ## Login
 
@@ -38,4 +44,4 @@ Existing owners with completed onboarding go to `/dashboard`. Incomplete owners 
 
 ## Dashboard activation
 
-A new owner with a property and zero residents sees a short checklist and Add your first resident (`/residents/new`).
+A new owner with a property and zero residents sees a short checklist. If rooms were skipped, the CTA is Add Rooms & Beds (`/rooms`). Otherwise Add your first resident (`/residents/new`).

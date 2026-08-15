@@ -36,9 +36,11 @@ Demo org slug: `urbanstay-pg` (`is_demo = true`).
 
 | Role | Properties | Writes |
 |------|------------|--------|
-| owner | all in org | yes |
-| property_admin | assigned only | yes, assigned only |
+| owner | all in org | yes, including property metadata, archive, floors |
+| property_admin | assigned only | rooms/beds on assigned properties |
 | viewer | assigned only | no |
+
+Occupancy and inventory rules: [AWAASLY_INVENTORY.md](./AWAASLY_INVENTORY.md).
 
 ## Floors
 

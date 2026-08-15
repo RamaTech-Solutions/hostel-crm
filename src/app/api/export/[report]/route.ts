@@ -26,8 +26,16 @@ export async function GET(
     case "occupancy": {
       const data = await getOccupancyByProperty(user);
       csv = toCsv([
-        ["Property", "Occupied", "Total Beds", "Occupancy %"],
-        ...data.map((d) => [d.name, String(d.occupied), String(d.total), String(d.occupancy)]),
+        ["Property", "Occupied", "Vacant", "Unavailable", "Capacity", "Total Beds", "Occupancy %"],
+        ...data.map((d) => [
+          d.name,
+          String(d.occupied),
+          String(d.vacant),
+          String(d.unavailable),
+          String(d.capacity),
+          String(d.total),
+          String(d.occupancy),
+        ]),
       ]);
       filename = "occupancy-report.csv";
       break;

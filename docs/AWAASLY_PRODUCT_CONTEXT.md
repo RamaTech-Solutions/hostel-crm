@@ -722,11 +722,13 @@ during initial account creation.
 
 Current intended onboarding:
 
-1. Welcome / Business
+1. Welcome
 2. First Property
-3. Floors / Structure
-4. Rooms / Beds
-5. Complete
+3. Floors
+4. Rooms / Beds (Continue requires a room; Skip for now is explicit)
+5. Finish → Dashboard or Add First Resident
+
+The first property is created once and updated in place. Floors and rooms are reconciled from persisted state. Bed count reductions never delete beds that have `bed_assignments` history. Property type remains in `properties.notes` until a dedicated column exists (P2).
 
 The experience must be:
 
