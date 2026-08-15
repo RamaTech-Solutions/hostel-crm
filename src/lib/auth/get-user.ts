@@ -107,4 +107,12 @@ export async function requireAuthUser(): Promise<AuthUser> {
   return user;
 }
 
-export { canWrite, isOwner, canAccessProperty } from "@/lib/auth/permissions";
+export {
+  canWrite,
+  isOwner,
+  canOwn,
+  canMutateTenant,
+  canAccessProperty,
+  canAccessResidentRecord,
+  DEMO_READ_ONLY,
+} from "@/lib/auth/permissions";

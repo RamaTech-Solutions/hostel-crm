@@ -14,6 +14,10 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
+  const { data: property } = await supabase.from("properties").select("id, status").eq("id", propertyId).maybeSingle();
+  if (!property || property.status !== "active") {
+    return NextResponse.json({ beds: [] });
+  }
   const [{ data: beds }, { data: assignments }] = await Promise.all([
     supabase
       .from("beds")

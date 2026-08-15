@@ -4,7 +4,7 @@ import { getAuthUser, canWrite } from "@/lib/auth/get-user";
 import { getResidents, getProperties } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ResidentStatusBadge } from "@/components/ui/status-badge";
 import { Plus } from "lucide-react";
 import { formatCurrency, formatDate, getInitials, maskIdNumber } from "@/lib/utils";
@@ -15,31 +15,47 @@ import type { ResidentStatus } from "@/types/database";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, DataTableHead, DataTh, DataTableBody, DataTr, DataTd } from "@/components/ui/data-table";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { LIST_PAGE_SIZE, parsePage } from "@/lib/list-query";
 
 export default async function ResidentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ property?: string; status?: string; search?: string }>;
+  searchParams: Promise<{ property?: string; status?: string; search?: string; page?: string }>;
 }) {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
   const params = await searchParams;
-  const [residents, properties] = await Promise.all([
+  const page = parsePage(params.page);
+  const [result, properties] = await Promise.all([
     getResidents(user, {
       propertyId: params.property,
       status: params.status,
       search: params.search,
+      page,
+      pageSize: LIST_PAGE_SIZE,
     }),
     getProperties(user),
   ]);
+  const residents = result.rows;
+
+  function hrefFor(nextPage: number) {
+    const query = new URLSearchParams();
+    if (params.property) query.set("property", params.property);
+    if (params.status) query.set("status", params.status);
+    if (params.search) query.set("search", params.search);
+    if (nextPage > 1) query.set("page", String(nextPage));
+    const qs = query.toString();
+    return qs ? `/residents?${qs}` : "/residents";
+  }
 
   return (
     <div>
       <Breadcrumbs items={[{ label: "Residents" }]} />
       <PageHeader
         title="Residents"
-        description={`${residents.length} residents`}
+        description={`${result.total} residents`}
         actions={
           canWrite(user) ? (
             <Button asChild>
@@ -55,10 +71,14 @@ export default async function ResidentsPage({
 
       {residents.length === 0 ? (
         <EmptyState
-          title="No residents yet"
-          description="Add your first resident to start tracking occupancy and rent."
+          title={params.search || params.property || params.status ? "No matching residents" : "No residents yet"}
+          description={
+            params.search || params.property || params.status
+              ? "Try another name, mobile, property or status. Former residents stay searchable."
+              : "Add your first resident to start tracking occupancy and rent."
+          }
           action={
-            canWrite(user) ? (
+            canWrite(user) && !params.search && !params.property && !params.status ? (
               <Button asChild><Link href="/residents/new">Add Resident</Link></Button>
             ) : null
           }
@@ -87,7 +107,6 @@ export default async function ResidentsPage({
                       <DataTd>
                         <Link href={`/residents/${resident.id}`} className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            {resident.photo_url && <AvatarImage src={resident.photo_url} />}
                             <AvatarFallback className="text-xs">{getInitials(resident.full_name)}</AvatarFallback>
                           </Avatar>
                           <div>
@@ -136,6 +155,7 @@ export default async function ResidentsPage({
               );
             })}
           </div>
+          <ListPagination page={page} pageSize={LIST_PAGE_SIZE} total={result.total} hrefFor={hrefFor} />
         </>
       )}
     </div>

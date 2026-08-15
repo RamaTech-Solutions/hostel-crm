@@ -56,6 +56,15 @@ describe("migration guards", () => {
     expect(sql).not.toMatch(/USING \(bucket_id = 'resident-documents'\);/);
   });
 
+  it("sprint 6 storage is resident-scoped and private", () => {
+    const sql = migration("20260815190000_document_security.sql");
+    expect(sql).toContain("storage_resident_id_from_object_name");
+    expect(sql).toContain("can_access_resident");
+    expect(sql).toContain("file_size_limit = 5242880");
+    expect(sql).not.toMatch(/CREATE POLICY "resident_documents_update"/);
+    expect(sql).not.toContain("TO anon");
+  });
+
   it("resident child tables use can_access_resident", () => {
     const sql = migration("20260814120300_harden_table_rls.sql");
     expect(sql).toContain("public.can_access_resident(resident_id)");

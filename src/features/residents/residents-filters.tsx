@@ -17,6 +17,7 @@ export function ResidentsFilters({ properties }: { properties: Property[] }) {
     const params = new URLSearchParams(searchParams.toString());
     if (value && value !== "all") params.set(key, value);
     else params.delete(key);
+    params.delete("page");
     router.push(`/residents?${params.toString()}`);
   }
 
@@ -55,9 +56,10 @@ export function ResidentsFilters({ properties }: { properties: Property[] }) {
         <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="staying">Currently staying</SelectItem>
           <SelectItem value="active">Active</SelectItem>
           <SelectItem value="notice_period">Notice Period</SelectItem>
-          <SelectItem value="checked_out">Checked Out</SelectItem>
+          <SelectItem value="checked_out">Former / Checked Out</SelectItem>
         </SelectContent>
       </Select>
     </div>

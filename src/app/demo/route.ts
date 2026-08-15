@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+/** Best-effort in-memory limit for this server instance only. Not shared across Vercel instances. */
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function clientKey(request: NextRequest): string {

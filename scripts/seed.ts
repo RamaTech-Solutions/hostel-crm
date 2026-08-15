@@ -9,6 +9,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { assertDemoSeedTarget, supabaseProjectRefFromUrl } from "../src/lib/supabase-project-ref";
 
 function loadEnv() {
   try {
@@ -52,14 +53,32 @@ if (
   serviceKey === "your-service-role-key"
 ) {
   console.error(
-    "\n❌ .env.local still has placeholder values.\n" +
-      "   Save your real Supabase URL and service_role key to pg-crm/.env.local\n" +
-      "   (Project Settings → API), then run: npm run seed\n"
+    "\n.env.local still has placeholder values.\n" +
+      "   Save your staging Supabase URL and service_role key to pg-crm/.env.local\n"
   );
   process.exit(1);
 }
 
-console.log(`Using Supabase: ${url.replace(/^https?:\/\//, "")}`);
+const seedGuard = assertDemoSeedTarget({
+  supabaseUrl: url,
+  allowDemoSeed: process.env.ALLOW_DEMO_SEED,
+  confirmRef: process.env.CONFIRM_SUPABASE_PROJECT_REF,
+  productionRef: process.env.PRODUCTION_SUPABASE_PROJECT_REF,
+});
+if (!seedGuard.ok) {
+  console.error(seedGuard.error);
+  process.exit(1);
+}
+
+const host = (() => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "(invalid host)";
+  }
+})();
+console.log(`Using Supabase host: ${host}`);
+console.log(`Using Supabase project ref: ${supabaseProjectRefFromUrl(url)}`);
 
 const supabase = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -320,10 +339,7 @@ async function seed() {
   console.log("✓ Activity logs created");
 
   console.log("\n✅ Seed complete!");
-  console.log("\nDemo credentials (password for all):", DEMO_PASSWORD);
-  console.log("  Owner:   owner@demo-hostel.com");
-  console.log("  Manager: manager@demo-hostel.com");
-  console.log("  Viewer:  viewer@demo-hostel.com");
+  console.log("Demo users exist for owner, manager, and viewer emails (password not printed).");
 }
 
 seed().catch((err) => {

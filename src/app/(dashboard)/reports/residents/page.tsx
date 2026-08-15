@@ -10,13 +10,13 @@ export default async function ResidentsReportPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const residents = await getResidents(user, { status: "active" });
+  const { rows: residents } = await getResidents(user, { status: "staying" });
 
   return (
     <div>
       <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Residents" }]} />
       <div className="flex justify-between mb-6">
-        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Active residents</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Currently staying</h1>
         <Button asChild variant="outline" size="sm"><Link href="/api/export/residents">Export CSV</Link></Button>
       </div>
       <div className="overflow-x-auto rounded-lg border bg-card">

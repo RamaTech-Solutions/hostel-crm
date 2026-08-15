@@ -12,13 +12,13 @@ export default async function PaymentsReportPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const payments = await getPayments(user);
+  const { rows: payments } = await getPayments(user);
 
   return (
     <div>
       <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Payments" }]} />
       <div className="flex justify-between mb-6">
-        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Payments</h1>
+        <h1 className="text-[32px] font-semibold leading-10 tracking-tight">Receipts</h1>
         <Button asChild variant="outline" size="sm"><Link href="/api/export/payments">Export CSV</Link></Button>
       </div>
       <div className="overflow-x-auto rounded-lg border bg-card">

@@ -14,9 +14,13 @@ export default async function NewResidentPage() {
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: "Residents", href: "/residents" }, { label: "Onboard Resident" }]} />
-      <PageHeader title="Add resident" description="Guided setup. You can add documents after the resident is created." />
-      <OnboardingWizard properties={properties} />
+      <Breadcrumbs items={[{ label: "Residents", href: "/residents" }, { label: "Add Resident" }]} />
+      <PageHeader title="Add resident" description="Three steps. Documents and photo can be added after create." />
+      {properties.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Add an active property before assigning a bed.</p>
+      ) : (
+        <OnboardingWizard properties={properties} />
+      )}
     </div>
   );
 }

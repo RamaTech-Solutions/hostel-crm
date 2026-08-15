@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LandingNav } from "@/features/marketing/landing-nav";
 import { StatCard } from "@/components/ui/stat-card";
 import { AwaaslyLogo } from "@/components/brand/awaasly-logo";
+import { getDemoHref, getPublicSignupHref } from "@/lib/app-url";
 
 const features = [
   { title: "Multi-Property Management", text: "See every PG and hostel from one account.", icon: Building2 },
@@ -75,9 +76,9 @@ export function LandingPage({ showDashboard }: { showDashboard: boolean }) {
           {showDashboard ? (
             <Button asChild size="lg"><Link href="/dashboard">Open Dashboard</Link></Button>
           ) : (
-            <Button asChild size="lg"><Link href="/signup">Start Free</Link></Button>
+            <Button asChild size="lg"><Link href={getPublicSignupHref()}>Start Free</Link></Button>
           )}
-          <Button asChild size="lg" variant="outline"><Link href="/demo">Explore Demo</Link></Button>
+          <Button asChild size="lg" variant="outline"><Link href={getDemoHref()}>Explore Demo</Link></Button>
         </div>
         <div className="mt-12">
           <ProductPreview />
@@ -143,7 +144,7 @@ export function LandingPage({ showDashboard }: { showDashboard: boolean }) {
           <p className="mt-3 text-sm leading-[22px] text-muted-foreground">
             Explore Awaasly with sample PG data. No password sharing.
           </p>
-          <Button asChild className="mt-6"><Link href="/demo">Explore Live Demo</Link></Button>
+          <Button asChild className="mt-6"><Link href={getDemoHref()}>Explore Live Demo</Link></Button>
         </div>
       </section>
 
@@ -159,7 +160,7 @@ export function LandingPage({ showDashboard }: { showDashboard: boolean }) {
                 Start with a free pilot. Set up your properties and run daily operations while we grow Awaasly with early operators.
               </p>
               <Button asChild className="w-full">
-                <Link href={showDashboard ? "/dashboard" : "/signup"}>
+                <Link href={showDashboard ? "/dashboard" : getPublicSignupHref()}>
                   {showDashboard ? "Open Dashboard" : "Start Free"}
                 </Link>
               </Button>

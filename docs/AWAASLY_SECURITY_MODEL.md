@@ -22,7 +22,10 @@ Residents with `property_id IS NULL` are **owner-only**.
 Helpers:
 
 - `get_user_role()` — role for the user’s current organization (join on `profiles.organization_id`)
-- `can_user_write()` — owner or property_admin
+- `can_user_write()` — owner or property_admin **and not a demo org** (`can_mutate_tenant()`)
+- `can_user_own()` — owner **and not a demo org**
+
+Demo org (`organizations.is_demo`): no persistent business writes except logout / start own workspace. See [AWAASLY_PRODUCTION_HARDENING.md](./AWAASLY_PRODUCTION_HARDENING.md).
 
 Viewers: SELECT on assigned properties; no INSERT/UPDATE/DELETE on operational data.
 
@@ -32,21 +35,23 @@ Sprint 3 inventory matrix (enforced in RLS, not only UI):
 - **property_admin:** room and bed writes on assigned properties; cannot update properties or floors
 - **viewer:** read only
 
-`properties_update` and `floors_*` write policies require `get_user_role() = 'owner'`. `rooms_*` and `beds_*` writes still use `can_user_write()` plus assigned `property_id`.
+`properties_update` and `floors_*` write policies require `can_user_own()`. `rooms_*` and `beds_*` writes still use `can_user_write()` plus assigned `property_id`.
 
 ## Storage isolation
 
-Bucket `resident-documents` is private.
+Bucket `resident-documents` is private (`public = false`), 5 MB, MIME allowlist PDF/JPEG/PNG/WebP.
 
 Object name:
 
 ```text
-{organization_id}/{property_id}/{resident_id}/{safe-file-name}
+{organization_id}/{resident_id}/{document_id}.{ext}
 ```
 
-Policies compare `(storage.foldername(name))[1]` to the user’s org and `[2]` to assigned properties. Owners may access all org prefixes. Viewers may SELECT only. Writes require `can_user_write()`.
+`public.storage_resident_id_from_object_name` validates that three-segment UUID path (fail closed) then Storage SELECT uses `can_access_resident(resident_id)`. INSERT/DELETE also require `can_user_write()`. There is no Storage UPDATE policy and no anonymous policy.
 
-The app builds the path on the server after loading the resident; clients do not supply org/property IDs.
+The app streams files from `GET /api/documents/[id]/content`. It does not redirect the browser to a Storage signed URL.
+
+Details: [AWAASLY_DOCUMENT_SECURITY.md](./AWAASLY_DOCUMENT_SECURITY.md).
 
 ## SECURITY DEFINER
 

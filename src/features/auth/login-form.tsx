@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toUserError } from "@/lib/user-error";
-import { isSafeNextPath } from "@/lib/app-url";
+import { isSafeNextPath, getDemoHref } from "@/lib/app-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -95,7 +95,7 @@ export function LoginForm() {
       </form>
 
       <Button asChild variant="outline" className="mt-4 w-full">
-        <Link href="/demo">Explore Demo</Link>
+        <Link href={getDemoHref()}>Explore Demo</Link>
       </Button>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}

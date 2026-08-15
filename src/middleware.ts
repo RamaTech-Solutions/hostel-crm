@@ -38,6 +38,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user && !isPublicPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     if (hasSupabaseAuthCookie(request)) {

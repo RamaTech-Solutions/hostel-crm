@@ -66,6 +66,7 @@ export const roomSchema = z.object({
 });
 
 export const paymentSchema = z.object({
+  payment_id: z.string().uuid(),
   resident_id: z.string().uuid(),
   property_id: z.string().uuid(),
   amount: z.coerce.number().positive("Amount must be positive"),
@@ -73,8 +74,10 @@ export const paymentSchema = z.object({
   payment_type: z.enum(["rent", "deposit", "refund", "other"]),
   payment_method: z.enum(["cash", "upi", "bank_transfer", "card", "other"]),
   transaction_reference: z.string().optional(),
-  rent_month: z.string().optional(),
-  status: z.enum(["paid", "partial", "pending", "overdue"]),
+  rent_charge_id: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.string().uuid().optional()
+  ),
   notes: z.string().optional(),
 });
 

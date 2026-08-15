@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { getAuthUser } from "@/lib/auth/get-user";
 import { redirect } from "next/navigation";
+import { getAuthUser, canOwn, isOwner } from "@/lib/auth/get-user";
 import { getProperties, getPropertyOccupancyMap } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
-import { isOwner } from "@/lib/auth/get-user";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OccupancyBar } from "@/components/ui/occupancy-bar";
@@ -43,7 +42,7 @@ export default async function PropertiesPage({
                 </Link>
               </Button>
             ) : null}
-            {isOwner(user) && !archived ? (
+            {canOwn(user) && !archived ? (
               <Button asChild>
                 <Link href="/properties/new"><Plus className="h-4 w-4" />Add Property</Link>
               </Button>
@@ -61,7 +60,7 @@ export default async function PropertiesPage({
               : "Add your first property to start tracking rooms, beds and occupancy."
           }
           action={
-            isOwner(user) && !archived ? (
+            canOwn(user) && !archived ? (
               <Button asChild><Link href="/properties/new">Add Property</Link></Button>
             ) : null
           }

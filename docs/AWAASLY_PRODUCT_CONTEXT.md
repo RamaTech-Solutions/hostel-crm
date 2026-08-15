@@ -521,28 +521,19 @@ Never bypass RLS for normal customer operations merely to make code easier.
 
 # 16. STORAGE MODEL
 
-Resident documents should conceptually follow paths similar to:
+Resident documents follow:
 
 organization_id/
-property_id/
 resident_id/
-file
+{document_id}.{ext}
 
-The bucket must remain private.
+The bucket `resident-documents` must remain private. Do not create publicly readable resident document URLs. Do not redirect browsers to Storage signed URLs.
 
-Owner:
+Access uses `can_access_resident` (current authorized property), not a stale property folder in the object key.
 
-access organization documents.
+Owner: organization residents. Property admin / viewer: assigned-property residents (viewer read-only).
 
-Property Admin:
-
-access only assigned-property documents.
-
-Viewer:
-
-read according to approved permissions.
-
-Do not create publicly readable resident KYC/document URLs.
+Sprint 6 details: [AWAASLY_DOCUMENT_SECURITY.md](./AWAASLY_DOCUMENT_SECURITY.md).
 
 ---
 
@@ -619,7 +610,7 @@ Email confirmation guidance
 
 /demo
 
-Secure one-click demo login
+Secure one-click demo login on **staging** (and local). Production Explore Demo uses `NEXT_PUBLIC_DEMO_URL` so visitors open the stable staging `/demo` instead of a dead production `/demo`. Staging Start Free uses `NEXT_PUBLIC_PRIMARY_APP_URL` so new owners sign up on production.
 
 /forgot-password
 
@@ -797,12 +788,10 @@ Resident functionality is a core MVP area.
 
 Resident lifecycle conceptually includes:
 
-Resident onboarding
-→ Property
-→ Room/Bed
-→ Deposit
-→ Stay
-→ Payments
+Resident onboarding (Sprint 4): three screens — details, stay & financial setup, review. See [AWAASLY_RESIDENT_LIFECYCLE.md](./AWAASLY_RESIDENT_LIFECYCLE.md).
+
+Then:
+
 → Possible room transfer
 → Checkout
 → Historical resident
@@ -845,34 +834,11 @@ Future UX work should simplify this without removing required operational data.
 
 # 27. PAYMENTS
 
-Current `payments` primarily represent received transactions/receipts.
+`payments` are received transactions/receipts.
 
-Do not confuse:
+Sprint 5 adds `rent_charges` and Option A `payments.rent_charge_id`. Details: [AWAASLY_RENT_LEDGER.md](./AWAASLY_RENT_LEDGER.md).
 
-payment
-
-with:
-
-monthly rent obligation.
-
-A future model may introduce:
-
-rent_charges
-
-Example:
-
-Rent Charge
-₹8,500 due August 5
-
-Payment
-₹5,000 received August 3
-
-Outstanding
-₹3,500
-
-The full rent-charge/ledger model is intentionally deferred unless explicitly requested.
-
-Do not redesign the entire finance system incidentally during unrelated work.
+Do not confuse payment with monthly rent obligation. Do not auto-allocate legacy receipts. Do not report pending rent as ₹0 when the ledger is not generated.
 
 ---
 
@@ -902,19 +868,22 @@ within approximately five seconds.
 
 Primary owner-level metrics should prioritize:
 
-- number of properties
-- occupancy
-- residents
-- pending rent
+- number of active properties
+- occupancy (Sprint 3)
+- currently staying residents (active + notice period)
+- outstanding rent for the current month (Sprint 5 ledger), with rent-not-generated and incomplete-generation states
 
 Relevant attention signals may include:
 
-- overdue rent
+- overdue rent (all periods)
 - vacant beds
-- upcoming checkouts
-- missing documents
+- upcoming planned checkouts (7 calendar days)
+- missing resident documents (excluding profile photo)
+- missing emergency/guardian contact
 
 Do not fill the dashboard with vanity metrics.
+
+Dashboard details: [AWAASLY_DASHBOARD.md](./AWAASLY_DASHBOARD.md).
 
 ---
 
@@ -933,11 +902,10 @@ Use useful empty states and a simple setup checklist.
 
 Example:
 
-✓ Create account
 ✓ Add property
-✓ Configure rooms
+✓ Add rooms & beds
 ○ Add first resident
-○ Record first payment
+○ Generate rent when residents are ready
 
 Do not turn this into unnecessary gamification.
 
@@ -1282,11 +1250,11 @@ Awaasly helps PG and hostel operators manage properties, rooms, residents and co
 
 Primary CTA:
 
-Start Free
+Start Free (production `/signup`, or `NEXT_PUBLIC_PRIMARY_APP_URL/signup` from staging demo)
 
 Secondary CTA:
 
-Explore Demo
+Explore Demo (`/demo` on staging; production uses `NEXT_PUBLIC_DEMO_URL`)
 
 The landing page should stay calm and product-focused.
 

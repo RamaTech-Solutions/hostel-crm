@@ -35,7 +35,8 @@ Open [http://localhost:3000](http://localhost:3000) for the public landing page.
 |---------|-------------|
 | `npm run dev` | Dev server |
 | `npm run build` | Production build |
-| `npm run seed` | Seed demo org (service role) |
+| `npm run seed` | Staging demo seed (requires ALLOW_DEMO_SEED + CONFIRM_SUPABASE_PROJECT_REF) |
+| `npm run supabase:target` | Print configured Supabase host and project ref |
 | `npm test` | Unit tests |
 | `npm run smoke:rls` | Live tenant-isolation smoke |
 | `npm run test:e2e` | Playwright |

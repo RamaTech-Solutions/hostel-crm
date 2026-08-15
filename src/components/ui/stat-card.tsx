@@ -1,6 +1,7 @@
 import { cn, formatCurrency } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 interface StatCardProps {
   title: string;
@@ -11,6 +12,7 @@ interface StatCardProps {
   tone?: "default" | "danger" | "success" | "warning";
   className?: string;
   compact?: boolean;
+  href?: string;
 }
 
 const iconTone = {
@@ -28,21 +30,36 @@ export function StatCard({
   className,
   tone = "default",
   compact = false,
+  href,
 }: StatCardProps) {
+  const inner = (
+    <CardContent className={cn("p-5", compact && "p-4")}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">{title}</p>
+          <p className={cn("font-semibold tracking-tight", compact ? "text-xl" : "text-2xl")}>{value}</p>
+          {subtitle ? <p className="text-xs leading-4 text-muted-foreground">{subtitle}</p> : null}
+        </div>
+        <div className={cn("rounded-md p-2", iconTone[tone])}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+    </CardContent>
+  );
+
+  if (href) {
+    return (
+      <Card className={cn("shadow-none transition-colors hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring", className)}>
+        <Link href={href} className="block rounded-xl outline-none">
+          {inner}
+        </Link>
+      </Card>
+    );
+  }
+
   return (
     <Card className={cn("shadow-none", className)}>
-      <CardContent className={cn("p-5", compact && "p-4")}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">{title}</p>
-            <p className={cn("font-semibold tracking-tight", compact ? "text-xl" : "text-2xl")}>{value}</p>
-            {subtitle ? <p className="text-xs leading-4 text-muted-foreground">{subtitle}</p> : null}
-          </div>
-          <div className={cn("rounded-md p-2", iconTone[tone])}>
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
+      {inner}
     </Card>
   );
 }
@@ -55,6 +72,7 @@ export function StatCardCurrency({
   tone,
   compact,
   className,
+  href,
 }: Omit<StatCardProps, "value"> & { value: number }) {
   return (
     <StatCard
@@ -65,6 +83,7 @@ export function StatCardCurrency({
       tone={tone}
       compact={compact}
       className={className}
+      href={href}
     />
   );
 }

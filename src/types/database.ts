@@ -47,6 +47,7 @@ export interface Organization {
   slug: string;
   logo_url: string | null;
   settings: Json;
+  rent_due_day?: number;
   is_active: boolean;
   is_demo: boolean;
   onboarding_completed_at: string | null;
@@ -213,6 +214,7 @@ export interface Payment {
   payment_method: PaymentMethod;
   transaction_reference: string | null;
   rent_month: string | null;
+  rent_charge_id?: string | null;
   status: PaymentStatus;
   notes: string | null;
   created_at: string;
@@ -305,6 +307,7 @@ export interface DashboardStats {
   rentCollected: number;
   outstandingRent: number;
   securityDepositsHeld: number;
+  ledgerGenerated: boolean;
 }
 
 export interface PropertyStats {
@@ -316,6 +319,29 @@ export interface PropertyStats {
   collectedRent: number;
   pendingRent: number;
   occupancyPercent: number;
+  ledgerGenerated: boolean;
+}
+
+export type LedgerStatus = "due" | "partial" | "paid" | "overdue" | "voided";
+
+export interface RentChargeBalance {
+  id: string;
+  organization_id: string;
+  property_id: string;
+  resident_id: string;
+  charge_kind: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  amount_due: number;
+  notes: string | null;
+  voided_at: string | null;
+  created_at: string;
+  allocated_paid: number;
+  outstanding: number;
+  ledger_status: LedgerStatus;
+  resident?: { full_name: string; status?: string };
+  property?: { name: string };
 }
 
 export interface AuthUser {

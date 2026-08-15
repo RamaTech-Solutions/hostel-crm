@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getAllBeds } from "@/lib/queries";
+import { classifyBed } from "@/lib/inventory/occupancy";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
 
@@ -9,7 +10,10 @@ export default async function AvailableBedsReportPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const beds = (await getAllBeds(user)).filter((b) => b.status === "available");
+  const beds = (await getAllBeds(user)).filter((b) => classifyBed({
+    status: b.status,
+    hasActiveAssignment: Boolean(b.hasActiveAssignment),
+  }) === "vacant");
 
   return (
     <div>

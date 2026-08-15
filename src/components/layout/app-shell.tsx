@@ -10,14 +10,12 @@ export function AppShell({
   role,
   orgName,
   userName,
-  notificationCount,
   banner,
   children,
 }: {
   role: UserRole;
   orgName: string;
   userName: string;
-  notificationCount: number;
   banner?: ReactNode;
   children: ReactNode;
 }) {
@@ -28,7 +26,7 @@ export function AppShell({
       <Sidebar role={role} orgName={orgName} open={menuOpen} onOpenChange={setMenuOpen} />
       <div className="lg:pl-64">
         {banner}
-        <Header userName={userName} notificationCount={notificationCount} onMenuClick={() => setMenuOpen(true)} />
+        <Header userName={userName} onMenuClick={() => setMenuOpen(true)} />
         <main className="p-4 lg:p-6">{children}</main>
       </div>
     </div>

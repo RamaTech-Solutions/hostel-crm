@@ -1,67 +1,67 @@
-# Supabase Setup Checklist
+# Local setup
 
-Complete these steps before running the app locally.
+Use the **staging** Supabase project (`pg-crm-demo`) for `.env.local`. Do not point local seed at production.
 
-## 1. Create Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Copy **Project URL** and **anon public key** to `.env.local`
-3. Copy **service_role key** (Settings → API) for seed script only
-
-## 2. Run Database Migrations
-
-In Supabase **SQL Editor**, run in order:
-
-1. `supabase/migrations/001_initial_schema.sql`
-2. `supabase/migrations/002_rls_policies.sql`
-
-## 3. Storage Setup
-
-1. Go to **Storage** → Create bucket `resident-documents` (set to **Private**)
-2. Run `supabase/migrations/003_storage.sql` in SQL Editor
-
-## 4. Auth Configuration
-
-1. **Authentication** → Providers → Enable Email
-2. Disable public signups (optional, for demo)
-3. **URL Configuration** → Add redirect URLs:
-   - `http://localhost:3000/**`
-   - `https://your-app.vercel.app/**` (after deploy)
-
-## 5. Seed Demo Data
+## 1. Environment file
 
 ```bash
-npm run seed
+cp .env.example .env.local
 ```
 
-This creates:
-- Organization: UrbanStay PG
-- 3 properties, ~40 residents
-- Demo users (password: `Demo@12345`):
-  - `owner@demo-hostel.com`
-  - `manager@demo-hostel.com`
-  - `viewer@demo-hostel.com`
+Set (values from the staging Dashboard → Settings → API; do not commit them):
 
-## 6. Vercel Deployment
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (local seed/smoke only)
+- `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+- `DEMO_OWNER_EMAIL` / `DEMO_OWNER_PASSWORD` (staging demo login)
+- `NEXT_PUBLIC_PRIMARY_APP_URL` (production origin) so demo **Start Free** goes to production signup
 
-1. Push repo to GitHub
-2. Import in Vercel → Framework: Next.js
-3. Set environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (optional, for re-seeding)
-   - `NEXT_PUBLIC_APP_URL` (your Vercel URL)
-4. Deploy and add Vercel URL to Supabase redirect URLs
+Never put the service role or demo password in `NEXT_PUBLIC_*` or in Vercel Production.
 
-## Demo Checklist
+## 2. Database
 
-- [ ] Login works (owner + manager)
-- [ ] Dashboard shows populated KPIs
-- [ ] Property → room/bed view works
-- [ ] Resident search works
-- [ ] Onboarding wizard completes
-- [ ] Payment recording updates dashboard
-- [ ] Room transfer works
-- [ ] Checkout releases bed
-- [ ] Manager restricted to assigned property
-- [ ] Mobile layout acceptable
+Checked-in history is `supabase/migrations/` (timestamped). Do **not** run `supabase/legacy/*.sql` in the SQL Editor against staging or production.
+
+Local greenfield rehearsal (Docker):
+
+```bash
+npx supabase start
+npx supabase db reset
+```
+
+Never `npx supabase db reset --linked`.
+
+Remote apply (after printing the project ref):
+
+```bash
+npm run supabase:target
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+```
+
+## 3. Storage and Auth
+
+Bucket `resident-documents` is private (migrations + `config.toml`). Auth Site URL for local: `http://localhost:3000`. Staging Site URL: the **stable** staging origin. Production Site URL: `https://hostel-crm.vercel.app`.
+
+## 4. Seed (staging only)
+
+Requires both:
+
+```bash
+ALLOW_DEMO_SEED=1 CONFIRM_SUPABASE_PROJECT_REF=<staging-project-ref> npm run seed
+```
+
+The script derives the ref from `NEXT_PUBLIC_SUPABASE_URL` and aborts on mismatch or if the ref equals `PRODUCTION_SUPABASE_PROJECT_REF`. It does not print passwords.
+
+## 5. Run the app
+
+```bash
+npm run dev
+```
+
+Open http://localhost:3000 — **Explore Demo** uses `/demo` unless `NEXT_PUBLIC_DEMO_URL` is set.
+
+## 6. Vercel
+
+Set Preview vs Production variables per [docs/AWAASLY_DEPLOYMENT_RUNBOOK.md](docs/AWAASLY_DEPLOYMENT_RUNBOOK.md). Production must not include `DEMO_OWNER_*` or `SUPABASE_SERVICE_ROLE_KEY`. Production must set `NEXT_PUBLIC_DEMO_URL` to the stable staging `/demo`.

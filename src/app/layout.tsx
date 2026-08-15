@@ -19,14 +19,7 @@ export const metadata: Metadata = {
   description: "PG & Hostel Operations Platform. Manage properties, rooms, residents and collections from one place. A product of Ramatech Innovation Pvt Ltd.",
   applicationName: "Awaasly",
   icons: {
-    icon: [
-      { url: "/brand/favicon.svg", type: "image/svg+xml" },
-      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
-      { url: "/brand/favicon.ico" },
-    ],
-    shortcut: "/brand/favicon.ico",
-    apple: "/brand/apple-touch-icon.png",
+    icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
   },
   openGraph: {
     title: "Awaasly — Run all your PGs from one place",
