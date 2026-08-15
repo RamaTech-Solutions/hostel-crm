@@ -797,12 +797,10 @@ Resident functionality is a core MVP area.
 
 Resident lifecycle conceptually includes:
 
-Resident onboarding
-→ Property
-→ Room/Bed
-→ Deposit
-→ Stay
-→ Payments
+Resident onboarding (Sprint 4): three screens — details, stay & financial setup, review. See [AWAASLY_RESIDENT_LIFECYCLE.md](./AWAASLY_RESIDENT_LIFECYCLE.md).
+
+Then:
+
 → Possible room transfer
 → Checkout
 → Historical resident

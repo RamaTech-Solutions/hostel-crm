@@ -16,7 +16,19 @@ export default async function CheckoutPage({
 
   const resident = await getResident(residentId);
   if (!resident) notFound();
-  if (resident.status === "checked_out") redirect(`/residents/${residentId}`);
+
+  if (resident.status === "checked_out") {
+    return (
+      <div>
+        <Breadcrumbs items={[
+          { label: "Residents", href: "/residents" },
+          { label: resident.full_name, href: `/residents/${residentId}` },
+          { label: "Checkout" },
+        ]} />
+        <p className="text-sm text-muted-foreground">This resident is already checked out. History and payments are preserved.</p>
+      </div>
+    );
+  }
 
   return (
     <div>

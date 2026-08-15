@@ -57,7 +57,7 @@ export function ResidentsFilters({ properties }: { properties: Property[] }) {
           <SelectItem value="all">All Status</SelectItem>
           <SelectItem value="active">Active</SelectItem>
           <SelectItem value="notice_period">Notice Period</SelectItem>
-          <SelectItem value="checked_out">Checked Out</SelectItem>
+          <SelectItem value="checked_out">Former / Checked Out</SelectItem>
         </SelectContent>
       </Select>
     </div>

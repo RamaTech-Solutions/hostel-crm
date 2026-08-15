@@ -6,6 +6,7 @@ import {
   getResidentPayments,
   getResidentDocuments,
   getResidentActivity,
+  getResidentStayHistory,
 } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { ResidentStatusBadge, PaymentStatusBadge } from "@/components/ui/status-
 import { PaymentForm } from "@/features/payments/payment-form";
 import { DocumentUploadForm } from "@/features/documents/upload-form";
 import { formatCurrency, formatDate, getInitials, maskIdNumber, formatMobile } from "@/lib/utils";
-import { ArrowRightLeft, LogOut } from "lucide-react";
+import { ArrowRightLeft, LogOut, Pencil } from "lucide-react";
 import type { ResidentStatus, PaymentStatus } from "@/types/database";
 
 export default async function ResidentProfilePage({
@@ -28,11 +29,12 @@ export default async function ResidentProfilePage({
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const [resident, payments, documents, activity] = await Promise.all([
+  const [resident, payments, documents, activity, history] = await Promise.all([
     getResident(residentId),
     getResidentPayments(residentId),
     getResidentDocuments(residentId),
     getResidentActivity(residentId),
+    getResidentStayHistory(residentId),
   ]);
 
   if (!resident) notFound();
@@ -41,12 +43,17 @@ export default async function ResidentProfilePage({
     bed?: { bed_label: string };
     room?: { room_number: string };
     property?: { name: string };
+    start_date?: string;
   } | null;
   const property = resident.property as { id: string; name: string } | null;
   const contacts = resident.contacts ?? [];
   const guardian = contacts.find((c) => c.contact_type === "guardian");
+  const emergency = contacts.find((c) => c.contact_type === "emergency");
   const address = resident.permanent_address as { address_line?: string; city?: string; state?: string; pincode?: string } | null;
   const isActive = resident.status === "active" || resident.status === "notice_period";
+  const stayLabel = assignment?.room
+    ? `Room ${assignment.room.room_number}-${assignment.bed?.bed_label}`
+    : "No active bed";
 
   return (
     <div>
@@ -70,23 +77,32 @@ export default async function ResidentProfilePage({
             {property && (
               <p className="text-sm text-muted-foreground">
                 {property.name}
-                {assignment?.room && ` · Room ${assignment.room.room_number}-${assignment.bed?.bed_label}`}
+                {assignment?.room ? ` · ${stayLabel}` : ""}
               </p>
             )}
           </div>
         </div>
-        {canWrite(user) && isActive && (
+        {canWrite(user) && (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/residents/${residentId}/transfer`}>
-                <ArrowRightLeft className="h-4 w-4 mr-1" />Move
+              <Link href={`/residents/${residentId}/edit`}>
+                <Pencil className="h-4 w-4 mr-1" />Edit
               </Link>
             </Button>
-            <Button variant="destructive" size="sm" asChild>
-              <Link href={`/residents/${residentId}/checkout`}>
-                <LogOut className="h-4 w-4 mr-1" />Checkout
-              </Link>
-            </Button>
+            {isActive ? (
+              <>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/residents/${residentId}/transfer`}>
+                    <ArrowRightLeft className="h-4 w-4 mr-1" />Transfer
+                  </Link>
+                </Button>
+                <Button variant="destructive" size="sm" asChild>
+                  <Link href={`/residents/${residentId}/checkout`}>
+                    <LogOut className="h-4 w-4 mr-1" />Checkout
+                  </Link>
+                </Button>
+              </>
+            ) : null}
           </div>
         )}
       </div>
@@ -95,8 +111,9 @@ export default async function ResidentProfilePage({
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="identification">ID</TabsTrigger>
-          <TabsTrigger value="guardian">Guardian</TabsTrigger>
+          <TabsTrigger value="guardian">Contacts</TabsTrigger>
           <TabsTrigger value="stay">Stay</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -111,6 +128,9 @@ export default async function ResidentProfilePage({
               <InfoRow label="Mobile" value={formatMobile(resident.mobile)} />
               <InfoRow label="Email" value={resident.email ?? "—"} />
               <InfoRow label="Company / College" value={resident.company_college ?? "—"} />
+              <InfoRow label="Employee / Student ID" value={resident.employee_student_id ?? "—"} />
+              <InfoRow label="Work address" value={resident.work_address ?? "—"} className="sm:col-span-2" />
+              <InfoRow label="Remarks" value={resident.remarks ?? "—"} className="sm:col-span-2" />
               <InfoRow label="Address" value={address ? `${address.address_line}, ${address.city}, ${address.state} - ${address.pincode}` : "—"} className="sm:col-span-2" />
             </CardContent>
           </Card>
@@ -128,23 +148,60 @@ export default async function ResidentProfilePage({
         <TabsContent value="guardian" className="mt-4">
           <Card>
             <CardContent className="pt-6 grid gap-4 sm:grid-cols-2">
-              <InfoRow label="Name" value={guardian?.name ?? "—"} />
+              <InfoRow label="Guardian" value={guardian?.name ?? "—"} />
               <InfoRow label="Relation" value={guardian?.relation ?? "—"} />
-              <InfoRow label="Phone" value={guardian?.phone ?? "—"} />
+              <InfoRow label="Guardian phone" value={guardian?.phone ?? "—"} />
+              <InfoRow label="Emergency contact" value={emergency?.name ?? "—"} />
+              <InfoRow label="Emergency phone" value={emergency?.phone ?? "—"} />
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="stay" className="mt-4">
+        <TabsContent value="stay" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Complete profile</CardTitle></CardHeader>
+            <CardContent className="text-sm space-y-1">
+              <p>✓ Basic details</p>
+              <p>{assignment ? "✓ Stay assigned" : "○ Stay assigned"}</p>
+              <p>{emergency ? "✓ Emergency contact" : "○ Emergency contact"}</p>
+              <p>{documents.length ? "✓ ID document" : "○ Upload ID document"}</p>
+              <p>{resident.photo_url ? "✓ Photo" : "○ Add photo"}</p>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="pt-6 grid gap-4 sm:grid-cols-2">
-              <InfoRow label="Property" value={property?.name ?? "—"} />
+              <InfoRow label="Property" value={assignment?.property?.name ?? property?.name ?? "—"} />
               <InfoRow label="Room / Bed" value={assignment?.room ? `${assignment.room.room_number} - Bed ${assignment.bed?.bed_label}` : "—"} />
-              <InfoRow label="Joining Date" value={formatDate(resident.joining_date)} />
-              <InfoRow label="Planned Checkout" value={formatDate(resident.planned_checkout_date)} />
-              <InfoRow label="Monthly Rent" value={formatCurrency(Number(resident.monthly_rent))} />
-              <InfoRow label="Security Deposit" value={formatCurrency(Number(resident.security_deposit_amount))} />
-              <InfoRow label="Agreement" value={resident.agreement_status} />
+              <InfoRow label="Move-in" value={formatDate(assignment?.start_date ?? resident.joining_date)} />
+              <InfoRow label="Planned checkout" value={formatDate(resident.planned_checkout_date)} />
+              <InfoRow label="Monthly rent" value={formatCurrency(Number(resident.monthly_rent))} />
+              <InfoRow label="Security deposit" value={formatCurrency(Number(resident.security_deposit_amount))} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Stay history</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {history.assignments.map((row, index) => (
+                <div key={row.id}>
+                  {index === 0 ? "Move in" : row.end_date ? "Stay ended" : "Current stay"}
+                  {": "}
+                  {(row.property as { name?: string } | null)?.name}
+                  {" · Room "}
+                  {(row.room as { room_number?: string } | null)?.room_number}
+                  {" · Bed "}
+                  {(row.bed as { bed_label?: string } | null)?.bed_label}
+                  {" · "}
+                  {formatDate(row.start_date)}
+                  {row.end_date ? ` → ${formatDate(row.end_date)}` : ""}
+                </div>
+              ))}
+              {history.transfers.map((row) => (
+                <div key={row.id}>Room transfer · {formatDate(row.transfer_date)}{row.reason ? ` · ${row.reason}` : ""}</div>
+              ))}
+              {resident.status === "checked_out" ? <div>Checkout · {formatDate(resident.planned_checkout_date)}</div> : null}
             </CardContent>
           </Card>
         </TabsContent>

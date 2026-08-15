@@ -17,6 +17,7 @@ export function CheckoutForm({ residentId, depositAmount }: { residentId: string
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     const result = await checkoutResident(residentId, formData);

@@ -55,10 +55,14 @@ export default async function ResidentsPage({
 
       {residents.length === 0 ? (
         <EmptyState
-          title="No residents yet"
-          description="Add your first resident to start tracking occupancy and rent."
+          title={params.search || params.property || params.status ? "No matching residents" : "No residents yet"}
+          description={
+            params.search || params.property || params.status
+              ? "Try another name, mobile, property or status. Former residents stay searchable."
+              : "Add your first resident to start tracking occupancy and rent."
+          }
           action={
-            canWrite(user) ? (
+            canWrite(user) && !params.search && !params.property && !params.status ? (
               <Button asChild><Link href="/residents/new">Add Resident</Link></Button>
             ) : null
           }

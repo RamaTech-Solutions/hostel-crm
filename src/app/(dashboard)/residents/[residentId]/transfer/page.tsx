@@ -34,6 +34,11 @@ export default async function TransferPage({
         residentId={residentId}
         properties={properties}
         currentPropertyId={resident.property_id ?? properties[0]?.id ?? ""}
+        currentStay={
+          resident.bed_assignment?.room
+            ? `Room ${resident.bed_assignment.room.room_number} · Bed ${resident.bed_assignment.bed?.bed_label ?? ""}`
+            : "Current stay"
+        }
       />
     </div>
   );
