@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Cursor local files and plans
+.cursor/
 
 # next.js
 /.next/
