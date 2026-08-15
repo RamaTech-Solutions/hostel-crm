@@ -29,5 +29,29 @@ test.describe("Awaasly", () => {
     await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
     await expect(page.getByLabel("Full Name")).toBeVisible();
     await expect(page.getByLabel("Business / PG Name")).toBeVisible();
+    await expect(page.getByText("Password requirements")).toBeVisible();
+  });
+
+  test("login has forgot password link", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByRole("link", { name: /Forgot password/i })).toBeVisible();
+  });
+
+  test("forgot password page loads", async ({ page }) => {
+    await page.goto("/forgot-password");
+    await expect(page.getByRole("heading", { name: /Forgot password/i })).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+  });
+
+  test("reset password without session shows expired state", async ({ page }) => {
+    await page.goto("/reset-password");
+    await expect(page.getByText(/invalid or has expired/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: /Request a New Reset Link/i })).toBeVisible();
+  });
+
+  test("check email page loads", async ({ page }) => {
+    await page.goto("/signup/check-email");
+    await expect(page.getByRole("heading", { name: /Check your email/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to Login/i })).toBeVisible();
   });
 });

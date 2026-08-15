@@ -26,7 +26,7 @@ Resume is derived from data: no org → business; no property → property; no f
 
 ## Login
 
-Existing owners with completed onboarding go to `/dashboard`. Incomplete owners return to `/onboarding`.
+Existing owners with completed onboarding go to `/dashboard`. Incomplete owners return to `/onboarding`. `Forgot password?` on `/login` opens `/forgot-password`. A valid reset email lands on `/reset-password` after `/auth/callback`.
 
 ## Manager / viewer
 

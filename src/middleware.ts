@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const AUTH_PATHS = ["/login", "/signup"];
+const AUTH_PATHS = ["/login", "/signup", "/forgot-password"];
 const PUBLIC_PATHS = [
   "/",
   "/login",
   "/signup",
+  "/forgot-password",
+  "/reset-password",
   "/auth/callback",
   "/setup",
   "/demo",
@@ -18,9 +20,14 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
 }
 
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies.getAll().some((cookie) => cookie.name.includes("-auth-token"));
+}
+
 export async function middleware(request: NextRequest) {
   const { response, user, configured, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
+  const onResetPassword = pathname === "/reset-password" || pathname.startsWith("/reset-password/");
 
   if (!configured && pathname !== "/setup") {
     return NextResponse.redirect(new URL("/setup", request.url));
@@ -33,6 +40,9 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublicPath(pathname)) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
+    if (hasSupabaseAuthCookie(request)) {
+      loginUrl.searchParams.set("error", "session");
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -72,11 +82,11 @@ export async function middleware(request: NextRequest) {
     const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
     const onAuthForm = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-    if (forceOwnerOnboarding && !onOnboarding && !pathname.startsWith("/auth/callback")) {
+    if (forceOwnerOnboarding && !onOnboarding && !pathname.startsWith("/auth/callback") && !onResetPassword) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
 
-    if (ready && (onOnboarding || onAuthForm)) {
+    if (ready && (onOnboarding || onAuthForm) && !onResetPassword) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

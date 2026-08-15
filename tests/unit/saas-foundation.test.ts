@@ -20,11 +20,23 @@ describe("signup schema", () => {
       full_name: "Test Owner",
       organization_name: "Test PG",
       email: "owner@example.com",
+      password: "Password1!",
+      confirm_password: "Password1!",
+      phone: "9876543210",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a weak password", () => {
+    const result = signupSchema.safeParse({
+      full_name: "Test Owner",
+      organization_name: "Test PG",
+      email: "owner@example.com",
       password: "password1",
       confirm_password: "password1",
       phone: "9876543210",
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 });
 

@@ -1,21 +1,42 @@
 import { z } from "zod";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/auth/password-policy";
+
+const passwordField = z.string().superRefine((value, ctx) => {
+  if (!validatePassword(value).valid) {
+    ctx.addIssue({ code: "custom", message: PASSWORD_POLICY_MESSAGE });
+  }
+});
 
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    password: passwordField,
+    confirm_password: z.string().min(1, "Confirm your password"),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: "Passwords do not match.",
+    path: ["confirm_password"],
+  });
 
 export const signupSchema = z
   .object({
     full_name: z.string().min(2, "Full name is required"),
     organization_name: z.string().min(2, "Business name is required"),
     email: z.string().email("Enter a valid email"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirm_password: z.string().min(8, "Confirm your password"),
+    password: passwordField,
+    confirm_password: z.string().min(1, "Confirm your password"),
     phone: z.string().regex(/^\d{10}$/, "Enter a valid 10-digit mobile number"),
   })
   .refine((data) => data.password === data.confirm_password, {
-    message: "Passwords do not match",
+    message: "Passwords do not match.",
     path: ["confirm_password"],
   });
 
