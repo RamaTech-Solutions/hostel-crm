@@ -32,7 +32,7 @@ function ProductPreview() {
       </p>
       <div className="grid min-h-[280px] md:grid-cols-[180px_1fr]">
         <div className="hidden bg-sidebar p-4 md:block">
-          <AwaaslyLogo variant="reversed" size="sm" />
+          <AwaaslyLogo variant="reversed" placement="preview" />
           <div className="mt-6 space-y-1 text-xs">
             {["Overview", "Properties", "Residents", "Rent & Payments"].map((item, i) => (
               <div
@@ -169,7 +169,10 @@ export function LandingPage({ showDashboard }: { showDashboard: boolean }) {
       </section>
 
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        Awaasly · Every property. One place. · Ramatech Innovation Pvt Ltd
+        <div className="flex justify-center">
+          <AwaaslyLogo variant="primaryTagline" placement="footer" />
+        </div>
+        <p className="mt-3">Ramatech Innovation Pvt Ltd</p>
       </footer>
     </div>
   );

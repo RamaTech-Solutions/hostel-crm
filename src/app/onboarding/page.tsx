@@ -34,7 +34,7 @@ export default async function OnboardingPage() {
     <div className="flex min-h-screen items-start justify-center bg-background px-4 py-10">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
-          <AwaaslyLogo showTagline />
+          <AwaaslyLogo variant="stacked" placement="auth" />
         </div>
         <OnboardingWizard
           needsBootstrap={gate.status === "needs_bootstrap"}
