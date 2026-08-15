@@ -14,6 +14,7 @@ import type {
   Floor,
   ResidentContact,
   ResidentDocument,
+  RentChargeBalance,
 } from "@/types/database";
 
 export type ResidentDetail = Resident & {
@@ -55,7 +56,7 @@ import { summarizeOccupancy } from "@/lib/inventory/occupancy";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
-async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
+export async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
   if (!propertyIds.length) {
     return { beds: [] as { id: string; property_id: string; status: string; hasActiveAssignment: boolean }[], summary: summarizeOccupancy([]) };
   }
@@ -80,7 +81,7 @@ async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds:
   return { beds: occupancyBeds, summary: summarizeOccupancy(occupancyBeds) };
 }
 
-async function activePropertyIds(supabase: ServerSupabase, user: AuthUser) {
+export async function activePropertyIds(supabase: ServerSupabase, user: AuthUser) {
   let query = supabase.from("properties").select("id").eq("status", "active");
   if (user.role !== "owner") query = query.in("id", user.assignedPropertyIds);
   const { data } = await query;
@@ -144,33 +145,30 @@ export async function getDashboardStats(user: AuthUser): Promise<DashboardStats>
       return d >= monthStart && d <= monthEnd;
     }).length ?? 0;
 
-  const monthlyRentExpected =
-    residents
-      ?.filter((r) => r.status === "active" || r.status === "notice_period")
-      .reduce((sum, r) => sum + Number(r.monthly_rent), 0) ?? 0;
-
   const securityDepositsHeld =
     residents
       ?.filter((r) => r.status === "active" || r.status === "notice_period")
       .reduce((sum, r) => sum + Number(r.security_deposit_amount), 0) ?? 0;
 
   const rentMonth = format(now, "yyyy-MM-01");
-  let paymentsQuery = supabase
-    .from("payments")
-    .select("amount, status")
-    .eq("payment_type", "rent")
-    .gte("rent_month", rentMonth)
-    .lte("rent_month", rentMonth);
-  if (propertyFilter.length) paymentsQuery = paymentsQuery.in("property_id", propertyFilter);
-  else paymentsQuery = paymentsQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
-  const { data: payments } = await paymentsQuery;
-
-  const rentCollected =
-    payments
-      ?.filter((p) => p.status === "paid" || p.status === "partial")
-      .reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
-
-  const outstandingRent = Math.max(0, monthlyRentExpected - rentCollected);
+  let chargesQuery = supabase
+    .from("rent_charge_balances")
+    .select("amount_due, allocated_paid, outstanding, voided_at, period_start")
+    .eq("period_start", rentMonth)
+    .is("voided_at", null);
+  if (propertyFilter.length) chargesQuery = chargesQuery.in("property_id", propertyFilter);
+  else chargesQuery = chargesQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
+  const { data: charges } = await chargesQuery;
+  const ledgerGenerated = (charges?.length ?? 0) > 0;
+  const monthlyRentExpected = ledgerGenerated
+    ? charges?.reduce((sum, c) => sum + Number(c.amount_due), 0) ?? 0
+    : 0;
+  const rentCollected = ledgerGenerated
+    ? charges?.reduce((sum, c) => sum + Number(c.allocated_paid), 0) ?? 0
+    : 0;
+  const outstandingRent = ledgerGenerated
+    ? charges?.reduce((sum, c) => sum + Number(c.outstanding), 0) ?? 0
+    : 0;
 
   return {
     totalProperties: propertyFilter.length,
@@ -186,6 +184,7 @@ export async function getDashboardStats(user: AuthUser): Promise<DashboardStats>
     rentCollected,
     outstandingRent,
     securityDepositsHeld,
+    ledgerGenerated,
   };
 }
 
@@ -202,26 +201,23 @@ export async function getPropertyStats(propertyId: string): Promise<PropertyStat
   const occupiedBeds = occupancy.summary.occupied;
   const availableBeds = occupancy.summary.vacant;
 
-  const { data: residents } = await supabase
-    .from("residents")
-    .select("monthly_rent, status")
-    .eq("property_id", propertyId)
-    .in("status", ["active", "notice_period"]);
-
-  const monthlyExpectedRevenue = residents?.reduce((s, r) => s + Number(r.monthly_rent), 0) ?? 0;
-
   const rentMonth = format(new Date(), "yyyy-MM-01");
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("amount, status")
+  const { data: charges } = await supabase
+    .from("rent_charge_balances")
+    .select("amount_due, allocated_paid, outstanding, voided_at")
     .eq("property_id", propertyId)
-    .eq("payment_type", "rent")
-    .gte("rent_month", rentMonth);
-
-  const collectedRent =
-    payments
-      ?.filter((p) => p.status === "paid" || p.status === "partial")
-      .reduce((s, p) => s + Number(p.amount), 0) ?? 0;
+    .eq("period_start", rentMonth)
+    .is("voided_at", null);
+  const ledgerGenerated = (charges?.length ?? 0) > 0;
+  const monthlyExpectedRevenue = ledgerGenerated
+    ? charges?.reduce((s, c) => s + Number(c.amount_due), 0) ?? 0
+    : 0;
+  const collectedRent = ledgerGenerated
+    ? charges?.reduce((s, c) => s + Number(c.allocated_paid), 0) ?? 0
+    : 0;
+  const pendingRent = ledgerGenerated
+    ? charges?.reduce((s, c) => s + Number(c.outstanding), 0) ?? 0
+    : 0;
 
   return {
     totalRooms: totalRooms ?? 0,
@@ -230,8 +226,9 @@ export async function getPropertyStats(propertyId: string): Promise<PropertyStat
     availableBeds,
     monthlyExpectedRevenue,
     collectedRent,
-    pendingRent: Math.max(0, monthlyExpectedRevenue - collectedRent),
+    pendingRent,
     occupancyPercent: occupancy.summary.occupancyPercent,
+    ledgerGenerated,
   };
 }
 
@@ -240,21 +237,20 @@ export async function getOccupancyByProperty(user: AuthUser) {
   let query = supabase.from("properties").select("id, name").eq("status", "active");
   if (user.role !== "owner") query = query.in("id", user.assignedPropertyIds);
   const { data: properties } = await query;
-
-  const results = [];
-  for (const prop of properties ?? []) {
-    const occupancy = await occupancyBedsForProperties(supabase, [prop.id]);
-    results.push({
+  const ids = (properties ?? []).map((p) => p.id);
+  const occupancy = await occupancyBedsForProperties(supabase, ids);
+  return (properties ?? []).map((prop) => {
+    const summary = summarizeOccupancy(occupancy.beds.filter((bed) => bed.property_id === prop.id));
+    return {
       name: prop.name,
-      occupancy: occupancy.summary.occupancyPercent,
-      occupied: occupancy.summary.occupied,
-      total: occupancy.summary.total,
-      vacant: occupancy.summary.vacant,
-      unavailable: occupancy.summary.unavailable,
-      capacity: occupancy.summary.capacity,
-    });
-  }
-  return results;
+      occupancy: summary.occupancyPercent,
+      occupied: summary.occupied,
+      total: summary.total,
+      vacant: summary.vacant,
+      unavailable: summary.unavailable,
+      capacity: summary.capacity,
+    };
+  });
 }
 
 export async function getRecentActivity(user: AuthUser, limit = 10): Promise<ActivityLog[]> {
@@ -381,7 +377,8 @@ export async function getResidents(user: AuthUser, filters?: {
     query = query.in("property_id", user.assignedPropertyIds);
   }
   if (filters?.propertyId) query = query.eq("property_id", filters.propertyId);
-  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.status === "staying") query = query.in("status", ["active", "notice_period"]);
+  else if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.search) {
     query = query.or(
       `full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`
@@ -398,7 +395,8 @@ export async function getResidents(user: AuthUser, filters?: {
       .order("full_name");
     if (user.role !== "owner") fallback = fallback.in("property_id", user.assignedPropertyIds);
     if (filters?.propertyId) fallback = fallback.eq("property_id", filters.propertyId);
-    if (filters?.status) fallback = fallback.eq("status", filters.status);
+    if (filters?.status === "staying") fallback = fallback.in("status", ["active", "notice_period"]);
+    else if (filters?.status) fallback = fallback.eq("status", filters.status);
     if (filters?.search) {
       fallback = fallback.or(
         `full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`
@@ -553,6 +551,78 @@ export async function getPayments(user: AuthUser, filters?: { propertyId?: strin
   if (filters?.status) query = query.eq("status", filters.status);
   const { data } = await query;
   return (data ?? []) as PaymentWithRelations[];
+}
+
+export async function getRentCharges(
+  user: AuthUser,
+  filters: { periodStart: string; propertyId?: string; status?: string; search?: string }
+): Promise<RentChargeBalance[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("rent_charge_balances")
+    .select("*, resident:residents(full_name, status), property:properties(name)")
+    .eq("period_start", filters.periodStart)
+    .is("voided_at", null)
+    .order("due_date");
+  if (user.role !== "owner") query = query.in("property_id", user.assignedPropertyIds);
+  if (filters.propertyId) query = query.eq("property_id", filters.propertyId);
+  if (filters.status && filters.status !== "all") query = query.eq("ledger_status", filters.status);
+  const { data } = await query;
+  let rows = (data ?? []) as RentChargeBalance[];
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    rows = rows.filter((row) => (row.resident as { full_name?: string } | undefined)?.full_name?.toLowerCase().includes(q));
+  }
+  return rows;
+}
+
+export async function getPeriodLedgerSummary(user: AuthUser, periodStart: string, propertyId?: string) {
+  const charges = await getRentCharges(user, { periodStart, propertyId });
+  const ledgerGenerated = charges.length > 0;
+  const due = charges.reduce((s, c) => s + Number(c.amount_due), 0);
+  const collected = charges.reduce((s, c) => s + Number(c.allocated_paid), 0);
+  const outstanding = charges.reduce((s, c) => s + Number(c.outstanding), 0);
+
+  const supabase = await createClient();
+  let overdueQuery = supabase
+    .from("rent_charge_balances")
+    .select("outstanding")
+    .eq("ledger_status", "overdue")
+    .is("voided_at", null);
+  if (user.role !== "owner") overdueQuery = overdueQuery.in("property_id", user.assignedPropertyIds);
+  if (propertyId) overdueQuery = overdueQuery.eq("property_id", propertyId);
+  const { data: overdueRows } = await overdueQuery;
+  const overdue = (overdueRows ?? []).reduce((s, c) => s + Number(c.outstanding), 0);
+
+  let legacyQuery = supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("payment_type", "rent")
+    .is("rent_charge_id", null)
+    .eq("rent_month", periodStart);
+  if (user.role !== "owner") legacyQuery = legacyQuery.in("property_id", user.assignedPropertyIds);
+  if (propertyId) legacyQuery = legacyQuery.eq("property_id", propertyId);
+  const { count: legacyCount } = await legacyQuery;
+
+  return {
+    ledgerGenerated,
+    due: ledgerGenerated ? due : 0,
+    collected: ledgerGenerated ? collected : 0,
+    outstanding: ledgerGenerated ? outstanding : 0,
+    overdue,
+    legacyReceiptCount: legacyCount ?? 0,
+  };
+}
+
+export async function getResidentCharges(residentId: string): Promise<RentChargeBalance[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("rent_charge_balances")
+    .select("*")
+    .eq("resident_id", residentId)
+    .is("voided_at", null)
+    .order("period_start");
+  return (data ?? []) as RentChargeBalance[];
 }
 
 export async function getActivityLogs(user: AuthUser, limit = 50): Promise<ActivityLog[]> {

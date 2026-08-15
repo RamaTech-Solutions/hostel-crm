@@ -4,7 +4,7 @@ import { getAuthUser, canWrite } from "@/lib/auth/get-user";
 import { getResidents, getProperties } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ResidentStatusBadge } from "@/components/ui/status-badge";
 import { Plus } from "lucide-react";
 import { formatCurrency, formatDate, getInitials, maskIdNumber } from "@/lib/utils";
@@ -91,7 +91,6 @@ export default async function ResidentsPage({
                       <DataTd>
                         <Link href={`/residents/${resident.id}`} className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            {resident.photo_url && <AvatarImage src={resident.photo_url} />}
                             <AvatarFallback className="text-xs">{getInitials(resident.full_name)}</AvatarFallback>
                           </Avatar>
                           <div>

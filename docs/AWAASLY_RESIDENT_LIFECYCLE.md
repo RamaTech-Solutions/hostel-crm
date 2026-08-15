@@ -12,7 +12,7 @@ ID numbers are masked with `maskIdNumber` before persistence (`id_number_masked`
 
 | Resident setup | Payments module | Sprint 5 |
 |----------------|-----------------|----------|
-| monthly_rent, security_deposit_amount | received `payments` rows | rent_charges / dues / overdue |
+| monthly_rent, security_deposit_amount | received `payments` rows | `rent_charges` + `rent_charge_balances` — see [AWAASLY_RENT_LEDGER.md](./AWAASLY_RENT_LEDGER.md) |
 
 ## Idempotency
 

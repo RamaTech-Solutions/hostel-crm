@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { getAuthUser, canWrite } from "@/lib/auth/get-user";
+import { getAuthUser, canWrite, isOwner } from "@/lib/auth/get-user";
 import {
   getResident,
   getResidentPayments,
   getResidentDocuments,
   getResidentActivity,
   getResidentStayHistory,
+  getResidentCharges,
 } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -15,9 +16,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ResidentStatusBadge, PaymentStatusBadge } from "@/components/ui/status-badge";
 import { PaymentForm } from "@/features/payments/payment-form";
+import { LedgerStatusBadge } from "@/features/payments/ledger-status-badge";
+import { VoidChargeButton } from "@/features/payments/void-charge-button";
 import { DocumentUploadForm } from "@/features/documents/upload-form";
+import { DeleteDocumentButton } from "@/features/documents/delete-document-button";
 import { formatCurrency, formatDate, getInitials, maskIdNumber, formatMobile } from "@/lib/utils";
+import { monthStart, formatPeriodLabel } from "@/lib/finance/period";
 import { ArrowRightLeft, LogOut, Pencil } from "lucide-react";
+import { hasOperationalContact, hasResidentIdentityDocument } from "@/lib/residents/attention";
 import type { ResidentStatus, PaymentStatus } from "@/types/database";
 
 export default async function ResidentProfilePage({
@@ -29,12 +35,13 @@ export default async function ResidentProfilePage({
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const [resident, payments, documents, activity, history] = await Promise.all([
+  const [resident, payments, documents, activity, history, charges] = await Promise.all([
     getResident(residentId),
     getResidentPayments(residentId),
     getResidentDocuments(residentId),
     getResidentActivity(residentId),
     getResidentStayHistory(residentId),
+    getResidentCharges(residentId),
   ]);
 
   if (!resident) notFound();
@@ -51,6 +58,12 @@ export default async function ResidentProfilePage({
   const emergency = contacts.find((c) => c.contact_type === "emergency");
   const address = resident.permanent_address as { address_line?: string; city?: string; state?: string; pincode?: string } | null;
   const isActive = resident.status === "active" || resident.status === "notice_period";
+  const currentPeriod = monthStart(new Date());
+  const currentCharge = charges.find((c) => c.period_start === currentPeriod);
+  const totalOutstanding = charges.reduce((s, c) => s + Number(c.outstanding), 0);
+  const profilePhoto = documents.find((doc) => doc.document_type === "profile_photo");
+  const hasIdDocument = hasResidentIdentityDocument(documents);
+  const hasContact = hasOperationalContact(contacts);
   const stayLabel = assignment?.room
     ? `Room ${assignment.room.room_number}-${assignment.bed?.bed_label}`
     : "No active bed";
@@ -65,7 +78,7 @@ export default async function ResidentProfilePage({
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
-            {resident.photo_url && <AvatarImage src={resident.photo_url} />}
+            {profilePhoto && <AvatarImage src={`/api/documents/${profilePhoto.id}/content`} />}
             <AvatarFallback className="text-lg">{getInitials(resident.full_name)}</AvatarFallback>
           </Avatar>
           <div>
@@ -163,9 +176,9 @@ export default async function ResidentProfilePage({
             <CardContent className="text-sm space-y-1">
               <p>✓ Basic details</p>
               <p>{assignment ? "✓ Stay assigned" : "○ Stay assigned"}</p>
-              <p>{emergency ? "✓ Emergency contact" : "○ Emergency contact"}</p>
-              <p>{documents.length ? "✓ ID document" : "○ Upload ID document"}</p>
-              <p>{resident.photo_url ? "✓ Photo" : "○ Add photo"}</p>
+              <p>{hasContact ? "✓ Emergency or guardian contact" : "○ Add emergency or guardian contact"}</p>
+              <p>{hasIdDocument ? "✓ Resident document" : "○ Upload resident document"}</p>
+              <p>{profilePhoto ? "✓ Photo" : "○ Add photo"}</p>
             </CardContent>
           </Card>
           <Card>
@@ -176,6 +189,11 @@ export default async function ResidentProfilePage({
               <InfoRow label="Planned checkout" value={formatDate(resident.planned_checkout_date)} />
               <InfoRow label="Monthly rent" value={formatCurrency(Number(resident.monthly_rent))} />
               <InfoRow label="Security deposit" value={formatCurrency(Number(resident.security_deposit_amount))} />
+              <InfoRow
+                label="Current period"
+                value={currentCharge ? `${formatPeriodLabel(currentCharge.period_start)} · ${currentCharge.ledger_status}` : "Rent not generated"}
+              />
+              <InfoRow label="Total outstanding" value={formatCurrency(totalOutstanding)} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -207,11 +225,69 @@ export default async function ResidentProfilePage({
         </TabsContent>
 
         <TabsContent value="payments" className="mt-4 space-y-4">
-          {canWrite(user) && isActive && property && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Rent ledger</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p>Monthly rent (term): {formatCurrency(Number(resident.monthly_rent))}</p>
+              <p>Current period: {currentCharge ? formatPeriodLabel(currentCharge.period_start) : "Rent not generated"}</p>
+              {currentCharge ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>Status</span>
+                  <LedgerStatusBadge status={currentCharge.ledger_status} />
+                  <span>Outstanding {formatCurrency(Number(currentCharge.outstanding))}</span>
+                  {isOwner(user) ? (
+                    <VoidChargeButton
+                      chargeId={currentCharge.id}
+                      residentId={residentId}
+                      allocatedPaid={Number(currentCharge.allocated_paid)}
+                      outstanding={Number(currentCharge.outstanding)}
+                      voidedAt={currentCharge.voided_at}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+              {isOwner(user) ? (
+                <ul className="space-y-2">
+                  {charges
+                    .filter(
+                      (c) =>
+                        c.id !== currentCharge?.id &&
+                        Number(c.allocated_paid) === 0 &&
+                        Number(c.outstanding) > 0 &&
+                        !c.voided_at
+                    )
+                    .map((c) => (
+                      <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          {formatPeriodLabel(c.period_start)} · {formatCurrency(Number(c.outstanding))} outstanding
+                        </span>
+                        <VoidChargeButton
+                          chargeId={c.id}
+                          residentId={residentId}
+                          allocatedPaid={Number(c.allocated_paid)}
+                          outstanding={Number(c.outstanding)}
+                          voidedAt={c.voided_at}
+                        />
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+              <p className="font-medium">Total outstanding: {formatCurrency(totalOutstanding)}</p>
+              {Number(resident.monthly_rent) <= 0 ? (
+                <p className="text-muted-foreground">Monthly rent is ₹0, so regular rent charges are not generated. Set rent on Edit profile if this resident should be billed.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+          {canWrite(user) && property && (
             <Card>
               <CardHeader><CardTitle className="text-base">Record Payment</CardTitle></CardHeader>
               <CardContent>
-                <PaymentForm residentId={residentId} propertyId={property.id} defaultRent={Number(resident.monthly_rent)} />
+                <PaymentForm
+                  residentId={residentId}
+                  propertyId={property.id}
+                  defaultRent={Number(resident.monthly_rent)}
+                  charges={charges}
+                />
               </CardContent>
             </Card>
           )}
@@ -226,7 +302,7 @@ export default async function ResidentProfilePage({
                     <div key={p.id} className="flex items-center justify-between border-b pb-2">
                       <div>
                         <p className="font-medium">{formatCurrency(Number(p.amount))}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(p.payment_date)} · {p.payment_method}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(p.payment_date)} · {p.payment_method}{!p.rent_charge_id ? " · Unallocated (legacy)" : ""}</p>
                       </div>
                       <PaymentStatusBadge status={p.status as PaymentStatus} />
                     </div>
@@ -238,7 +314,7 @@ export default async function ResidentProfilePage({
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4 space-y-4">
-          {canWrite(user) && property && (
+          {canWrite(user) && (
             <Card>
               <CardHeader><CardTitle className="text-base">Upload Document</CardTitle></CardHeader>
               <CardContent>
@@ -254,19 +330,30 @@ export default async function ResidentProfilePage({
               ) : (
                 <div className="space-y-2">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between border-b pb-2">
+                    <div key={doc.id} className="flex items-center justify-between gap-3 border-b pb-2">
                       <div>
-                        <p className="font-medium capitalize">{doc.document_type.replace("_", " ")}</p>
+                        <p className="font-medium capitalize">{doc.document_type.replace(/_/g, " ")}</p>
                         <p className="text-xs text-muted-foreground">{doc.file_name}</p>
                       </div>
-                      <a
-                        href={`/api/documents/${doc.id}/signed-url`}
-                        className="text-sm font-medium underline-offset-4 hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View
-                      </a>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <a
+                          href={`/api/documents/${doc.id}/content`}
+                          className="text-sm font-medium underline-offset-4 hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </a>
+                        <a
+                          href={`/api/documents/${doc.id}/content?download=1`}
+                          className="text-sm font-medium underline-offset-4 hover:underline"
+                        >
+                          Download
+                        </a>
+                        {canWrite(user) ? (
+                          <DeleteDocumentButton documentId={doc.id} residentId={residentId} />
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -58,7 +58,7 @@ Do not apply if backup fails, history cannot be reconciled, dry-run drops unexpe
 2. `/login` for manager and viewer  
 3. Manager cannot open another property’s residents  
 4. Disposable `/signup` cannot see demo residents  
-5. Document upload path is `org/property/resident/file`
+5. Document files stream from `/api/documents/[id]/content` (path `org/resident/document.ext`)
 
 ## Local
 

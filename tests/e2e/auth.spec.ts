@@ -59,4 +59,9 @@ test.describe("Awaasly", () => {
     await page.goto("/onboarding");
     await expect(page).toHaveURL(/login/);
   });
+
+  test("document content is not public", async ({ page }) => {
+    await page.goto("/api/documents/33333333-3333-4333-8333-333333333333/content");
+    await expect(page).toHaveURL(/login/);
+  });
 });

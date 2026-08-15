@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuthUser, canWrite, canAccessProperty, isOwner } from "@/lib/auth/get-user";
+import { requireAuthUser, canWrite, canAccessProperty, canAccessResidentRecord, isOwner } from "@/lib/auth/get-user";
 import { logActivity } from "@/lib/queries";
 import {
   propertySchema,
@@ -21,6 +21,19 @@ import { decideFirstPropertyAction } from "@/lib/onboarding/first-property";
 import { generateFloorRows, nextFloorNumber, defaultFloorLabel } from "@/lib/onboarding/floors";
 import { planBedReconcile } from "@/lib/onboarding/beds";
 import { nextOnboardingCompletedAt } from "@/lib/onboarding/completion";
+import {
+  DOCUMENT_ERRORS,
+} from "@/lib/documents/errors";
+import {
+  documentStoragePath,
+  isAllowedDocumentType,
+  isUuid,
+  sanitizeDisplayFileName,
+  storagePathMatchesDocument,
+  validateUploadFile,
+} from "@/lib/documents/files";
+import { isCurrentBillingMonth, monthStart } from "@/lib/finance/period";
+import { FINANCE_ERRORS, mapFinanceError } from "@/lib/finance/errors";
 import { planOperationalRoomCreate, evaluateRoomDelete, canDeleteFloor, canToggleBedAvailability, DUPLICATE_ROOM_ERROR, LAST_ACTIVE_PROPERTY_ERROR } from "@/lib/inventory/room-ops";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -370,6 +383,7 @@ export async function deleteFloor(floorId: string, propertyId: string) {
   await supabase.from("properties").update({ floor_count: floorCount ?? 0 }).eq("id", propertyId);
 
   revalidatePath(`/properties/${propertyId}`);
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -421,6 +435,7 @@ export async function deleteRoom(roomId: string) {
   await logActivity(user.organization.id, user.id, "deleted", "room", roomId);
   revalidatePath(`/properties/${room.property_id}`);
   revalidatePath("/rooms");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -447,6 +462,7 @@ export async function setBedAvailability(bedId: string, nextStatus: "available" 
 
   revalidatePath(`/properties/${bed.property_id}`);
   revalidatePath("/rooms");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -613,14 +629,16 @@ export async function updateResident(residentId: string, formData: FormData) {
   await logActivity(user.organization.id, user.id, "updated", "resident", residentId);
   revalidatePath(`/residents/${residentId}`);
   revalidatePath("/residents");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
 export async function recordPayment(formData: FormData) {
   const user = await requireAuthUser();
-  if (!canWrite(user)) return { error: "Unauthorized" };
+  if (!canWrite(user)) return { error: FINANCE_ERRORS.recordUnauthorized };
 
   const parsed = paymentSchema.safeParse({
+    payment_id: formData.get("payment_id"),
     resident_id: formData.get("resident_id"),
     property_id: formData.get("property_id"),
     amount: formData.get("amount"),
@@ -628,32 +646,91 @@ export async function recordPayment(formData: FormData) {
     payment_type: formData.get("payment_type"),
     payment_method: formData.get("payment_method"),
     transaction_reference: formData.get("transaction_reference") || undefined,
-    rent_month: formData.get("rent_month") || undefined,
-    status: formData.get("status"),
+    rent_charge_id: formData.get("rent_charge_id") || undefined,
     notes: formData.get("notes") || undefined,
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  if (!canAccessProperty(user, parsed.data.property_id)) return { error: "Unauthorized" };
+  if (!canAccessProperty(user, parsed.data.property_id)) return { error: FINANCE_ERRORS.unauthorized };
 
+  const chargeId = parsed.data.rent_charge_id || null;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("payments")
-    .insert({
-      ...parsed.data,
-      organization_id: user.organization.id,
-      recorded_by: user.id,
-    })
-    .select()
-    .single();
+  const { data: rpc, error } = await supabase.rpc("record_resident_payment", {
+    p_payment_id: parsed.data.payment_id,
+    p_resident_id: parsed.data.resident_id,
+    p_property_id: parsed.data.property_id,
+    p_amount: parsed.data.amount,
+    p_payment_date: parsed.data.payment_date,
+    p_payment_type: parsed.data.payment_type,
+    p_payment_method: parsed.data.payment_method,
+    p_transaction_reference: parsed.data.transaction_reference ?? null,
+    p_rent_charge_id: parsed.data.payment_type === "rent" ? chargeId : null,
+    p_notes: parsed.data.notes ?? null,
+  });
 
-  if (error) return { error: error.message };
+  if (error) return { error: mapFinanceError(error.message, FINANCE_ERRORS.recordFailed) };
+  const result = rpc as { ok?: boolean; error?: string; payment_id?: string } | null;
+  if (!result?.ok) return { error: mapFinanceError(result?.error, FINANCE_ERRORS.recordFailed) };
 
-  await logActivity(user.organization.id, user.id, "payment_recorded", "payment", data.id);
+  await logActivity(user.organization.id, user.id, "payment_recorded", "payment", result.payment_id ?? parsed.data.payment_id);
   revalidatePath("/payments");
   revalidatePath("/dashboard");
   revalidatePath(`/residents/${parsed.data.resident_id}`);
-  return { data };
+  return { data: { id: result.payment_id ?? parsed.data.payment_id } };
+}
+
+export async function generateRentCharges(formData: FormData) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: FINANCE_ERRORS.generateUnauthorized };
+
+  const periodStart = monthStart(String(formData.get("period_start") || new Date().toISOString().slice(0, 10)));
+  if (!isCurrentBillingMonth(periodStart)) return { error: FINANCE_ERRORS.currentMonthOnly };
+
+  const supabase = await createClient();
+  const { data: rpc, error } = await supabase.rpc("generate_rent_charges", { p_period_start: periodStart });
+  if (error) return { error: mapFinanceError(error.message, FINANCE_ERRORS.generateFailed) };
+  const result = rpc as { ok?: boolean; error?: string; created_count?: number } | null;
+  if (!result?.ok) return { error: mapFinanceError(result?.error, FINANCE_ERRORS.generateFailed) };
+
+  revalidatePath("/payments");
+  revalidatePath("/dashboard");
+  revalidatePath("/residents");
+  return { data: result };
+}
+
+export async function voidRentCharge(formData: FormData) {
+  const user = await requireAuthUser();
+  if (!isOwner(user)) return { error: FINANCE_ERRORS.voidOwner };
+  const chargeId = String(formData.get("charge_id") || "");
+  if (!chargeId) return { error: "Charge is required." };
+
+  const supabase = await createClient();
+  const { data: rpc, error } = await supabase.rpc("void_rent_charge", {
+    p_charge_id: chargeId,
+    p_reason: String(formData.get("reason") || ""),
+  });
+  if (error) return { error: mapFinanceError(error.message, FINANCE_ERRORS.voidWithPayments) };
+  const result = rpc as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) return { error: mapFinanceError(result?.error, FINANCE_ERRORS.voidWithPayments) };
+  revalidatePath("/payments");
+  revalidatePath("/dashboard");
+  const residentId = String(formData.get("resident_id") || "");
+  if (residentId) revalidatePath(`/residents/${residentId}`);
+  return { success: true };
+}
+
+export async function updateOrgRentDueDay(formData: FormData) {
+  const user = await requireAuthUser();
+  if (!isOwner(user)) return { error: FINANCE_ERRORS.dueDayOwner };
+  const dueDay = Number(formData.get("rent_due_day"));
+  const supabase = await createClient();
+  const { data: rpc, error } = await supabase.rpc("update_org_rent_due_day", { p_due_day: dueDay });
+  if (error) return { error: mapFinanceError(error.message, FINANCE_ERRORS.dueDayRange) };
+  const result = rpc as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) return { error: mapFinanceError(result?.error, FINANCE_ERRORS.dueDayRange) };
+  revalidatePath("/settings");
+  revalidatePath("/payments");
+  return { success: true };
 }
 
 export async function transferResident(residentId: string, formData: FormData) {
@@ -1155,65 +1232,165 @@ export async function saveOnboardingRoom(formData: FormData) {
 
 export async function uploadDocument(formData: FormData) {
   const user = await requireAuthUser();
-  if (!canWrite(user)) return { error: "Unauthorized" };
+  if (!canWrite(user)) return { error: DOCUMENT_ERRORS.unauthorized };
 
   const residentId = String(formData.get("residentId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
   const documentType = String(formData.get("documentType") ?? "other");
   const file = formData.get("file");
 
-  if (!residentId || !(file instanceof File) || file.size === 0) {
-    return { error: "File and resident are required" };
+  if (!residentId || !documentId || !(file instanceof File)) {
+    return { error: "File and resident are required." };
   }
-  if (file.size > 5 * 1024 * 1024) {
-    return { error: "File must be under 5MB" };
-  }
+  if (!isUuid(residentId) || !isUuid(documentId)) return { error: DOCUMENT_ERRORS.unauthorized };
+  if (!isAllowedDocumentType(documentType)) return { error: DOCUMENT_ERRORS.unsupported };
+
+  const checked = validateUploadFile(file);
+  if (checked.error || !checked.ext || !checked.mime) return { error: checked.error ?? DOCUMENT_ERRORS.unsupported };
 
   const supabase = await createClient();
   const { data: resident } = await supabase
     .from("residents")
     .select("id, property_id, organization_id")
     .eq("id", residentId)
-    .single();
+    .maybeSingle();
 
-  if (
-    !resident ||
-    resident.organization_id !== user.organization.id ||
-    !resident.property_id ||
-    !canAccessProperty(user, resident.property_id)
-  ) {
-    return { error: "Unauthorized" };
+  if (!resident || !canAccessResidentRecord(user, resident)) {
+    return { error: DOCUMENT_ERRORS.unauthorized };
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storagePath = `${resident.organization_id}/${resident.property_id}/${resident.id}/${Date.now()}-${safeName}`;
+  const storagePath = documentStoragePath(resident.organization_id, resident.id, documentId, checked.ext);
+  if (!storagePath) return { error: DOCUMENT_ERRORS.unauthorized };
+
+  const { data: existing } = await supabase
+    .from("resident_documents")
+    .select("id, resident_id, storage_path, organization_id")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (existing) {
+    if (
+      existing.resident_id === resident.id &&
+      existing.organization_id === resident.organization_id &&
+      existing.storage_path === storagePath
+    ) {
+      return { data: { id: existing.id } };
+    }
+    return { error: DOCUMENT_ERRORS.conflictRetry };
+  }
+
+  const displayName = sanitizeDisplayFileName(file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: uploadError } = await supabase.storage
     .from("resident-documents")
-    .upload(storagePath, buffer, { contentType: file.type || "application/octet-stream" });
+    .upload(storagePath, buffer, { contentType: checked.mime, upsert: false });
 
-  if (uploadError) return { error: uploadError.message };
+  const objectAlreadyThere =
+    Boolean(uploadError?.message?.toLowerCase().includes("duplicate")) ||
+    Boolean(uploadError?.message?.toLowerCase().includes("already exists"));
+
+  if (uploadError && !objectAlreadyThere) {
+    return { error: DOCUMENT_ERRORS.uploadFailed };
+  }
 
   const { data, error } = await supabase
     .from("resident_documents")
     .insert({
+      id: documentId,
       resident_id: residentId,
       organization_id: user.organization.id,
       uploaded_by: user.id,
       document_type: documentType,
-      file_name: file.name,
+      file_name: displayName,
       storage_path: storagePath,
-      mime_type: file.type,
+      mime_type: checked.mime,
       file_size: file.size,
+      is_verified: false,
     })
-    .select()
+    .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    const { data: raced } = await supabase
+      .from("resident_documents")
+      .select("id, resident_id, storage_path")
+      .eq("id", documentId)
+      .maybeSingle();
+    if (raced && raced.resident_id === resident.id && raced.storage_path === storagePath) {
+      return { data: { id: raced.id } };
+    }
+    await supabase.storage.from("resident-documents").remove([storagePath]);
+    return { error: DOCUMENT_ERRORS.uploadFailed };
+  }
 
   await logActivity(user.organization.id, user.id, "document_uploaded", "resident_document", data.id);
   revalidatePath(`/residents/${residentId}`);
+  revalidatePath("/dashboard");
   return { data };
+}
+
+export async function deleteDocument(formData: FormData) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: DOCUMENT_ERRORS.unauthorized };
+
+  const documentId = String(formData.get("documentId") ?? "");
+  const residentId = String(formData.get("residentId") ?? "");
+  if (!documentId) return { error: DOCUMENT_ERRORS.missing };
+
+  const supabase = await createClient();
+  const { data: doc } = await supabase
+    .from("resident_documents")
+    .select("id, resident_id, organization_id, storage_path")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (!doc || doc.organization_id !== user.organization.id) {
+    return { error: DOCUMENT_ERRORS.unauthorized };
+  }
+  if (residentId && doc.resident_id !== residentId) return { error: DOCUMENT_ERRORS.unauthorized };
+
+  const { data: resident } = await supabase
+    .from("residents")
+    .select("id, property_id, organization_id")
+    .eq("id", doc.resident_id)
+    .maybeSingle();
+  if (!resident || !canAccessResidentRecord(user, resident)) {
+    return { error: DOCUMENT_ERRORS.unauthorized };
+  }
+  if (
+    !storagePathMatchesDocument({
+      storagePath: doc.storage_path,
+      organizationId: doc.organization_id,
+      residentId: doc.resident_id,
+      documentId: doc.id,
+    })
+  ) {
+    return { error: DOCUMENT_ERRORS.missing };
+  }
+
+  const { error: storageError } = await supabase.storage.from("resident-documents").remove([doc.storage_path]);
+  const storageMissing =
+    !storageError ||
+    storageError.message.toLowerCase().includes("not found") ||
+    String((storageError as { statusCode?: string }).statusCode) === "404";
+  if (!storageMissing) {
+    return { error: DOCUMENT_ERRORS.deleteFailed };
+  }
+
+  const { error: deleteError } = await supabase.from("resident_documents").delete().eq("id", doc.id);
+  if (deleteError) {
+    const retry = await supabase.from("resident_documents").delete().eq("id", doc.id);
+    if (retry.error) {
+      console.error("resident document metadata cleanup failed");
+      return { error: DOCUMENT_ERRORS.cleanupFailed };
+    }
+  }
+
+  await logActivity(user.organization.id, user.id, "deleted", "resident_document", doc.id);
+  revalidatePath(`/residents/${doc.resident_id}`);
+  revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function markNotificationRead(notificationId: string) {

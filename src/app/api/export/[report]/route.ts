@@ -6,6 +6,7 @@ import {
   getPayments,
   getAllBeds,
 } from "@/lib/queries";
+import { classifyBed } from "@/lib/inventory/occupancy";
 
 function toCsv(rows: string[][]): string {
   return rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -41,7 +42,7 @@ export async function GET(
       break;
     }
     case "residents": {
-      const data = await getResidents(user, { status: "active" });
+      const data = await getResidents(user, { status: "staying" });
       csv = toCsv([
         ["Name", "Mobile", "Property", "Joining Date", "Monthly Rent"],
         ...data.map((r) => [
@@ -68,11 +69,13 @@ export async function GET(
           p.payment_method,
         ]),
       ]);
-      filename = "payments-report.csv";
+      filename = "receipts-report.csv";
       break;
     }
     case "available-beds": {
-      const data = (await getAllBeds(user)).filter((b) => b.status === "available");
+      const data = (await getAllBeds(user)).filter((b) =>
+        classifyBed({ status: b.status, hasActiveAssignment: Boolean(b.hasActiveAssignment) }) === "vacant"
+      );
       csv = toCsv([
         ["Property", "Room", "Bed"],
         ...data.map((b) => [

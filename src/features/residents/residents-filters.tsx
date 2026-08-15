@@ -55,6 +55,7 @@ export function ResidentsFilters({ properties }: { properties: Property[] }) {
         <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="staying">Currently staying</SelectItem>
           <SelectItem value="active">Active</SelectItem>
           <SelectItem value="notice_period">Notice Period</SelectItem>
           <SelectItem value="checked_out">Former / Checked Out</SelectItem>

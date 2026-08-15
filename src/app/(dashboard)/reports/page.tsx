@@ -8,10 +8,10 @@ import { FileBarChart, Download } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 
 const reports = [
-  { href: "/reports/occupancy", title: "Occupancy Report", desc: "Property-wise bed occupancy rates" },
-  { href: "/reports/residents", title: "Resident Report", desc: "Current active residents list" },
-  { href: "/reports/payments", title: "Payment Report", desc: "Paid, pending, and overdue payments" },
-  { href: "/reports/available-beds", title: "Available Beds", desc: "All currently vacant beds" },
+  { href: "/reports/occupancy", title: "Occupancy Report", desc: "Property-wise bed occupancy (occupied / operational capacity)" },
+  { href: "/reports/residents", title: "Resident Report", desc: "Currently staying residents (active and notice period)" },
+  { href: "/reports/payments", title: "Receipts Report", desc: "Received payment receipts — not rent charge outstanding" },
+  { href: "/reports/available-beds", title: "Vacant Beds", desc: "Usable beds without an active assignment" },
 ];
 
 export default async function ReportsPage() {
