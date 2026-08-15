@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { getAppUrl } from "@/lib/app-url";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || "https://hostel-crm.vercel.app";
+  const base = getAppUrl();
   return [
     { url: base, changeFrequency: "weekly", priority: 1 },
     { url: `${base}/login`, changeFrequency: "monthly", priority: 0.6 },

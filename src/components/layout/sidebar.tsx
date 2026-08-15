@@ -58,7 +58,7 @@ export function Sidebar({ role, orgName, open, onOpenChange }: SidebarProps) {
     <>
       <div className="flex h-16 items-center border-b border-white/10 px-5">
         <Link href="/dashboard" className="min-w-0" onClick={() => onOpenChange(false)}>
-          <AwaaslyLogo variant="reversed" size="sm" />
+          <AwaaslyLogo variant="reversed" placement="sidebar" />
           <p className="mt-1 truncate text-xs text-sidebar-foreground/60">{orgName}</p>
         </Link>
       </div>

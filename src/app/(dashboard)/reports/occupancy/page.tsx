@@ -23,6 +23,9 @@ export default async function OccupancyReportPage() {
           <thead><tr className="border-b bg-muted/50">
             <th className="px-4 py-3 text-left">Property</th>
             <th className="px-4 py-3 text-left">Occupied</th>
+            <th className="px-4 py-3 text-left">Vacant</th>
+            <th className="px-4 py-3 text-left">Unavailable</th>
+            <th className="px-4 py-3 text-left">Capacity</th>
             <th className="px-4 py-3 text-left">Total Beds</th>
             <th className="px-4 py-3 text-left">Occupancy %</th>
           </tr></thead>
@@ -31,6 +34,9 @@ export default async function OccupancyReportPage() {
               <tr key={row.name} className="border-b">
                 <td className="px-4 py-3 font-medium">{row.name}</td>
                 <td className="px-4 py-3">{row.occupied}</td>
+                <td className="px-4 py-3">{row.vacant}</td>
+                <td className="px-4 py-3">{row.unavailable}</td>
+                <td className="px-4 py-3">{row.capacity}</td>
                 <td className="px-4 py-3">{row.total}</td>
                 <td className="px-4 py-3">{row.occupancy}%</td>
               </tr>

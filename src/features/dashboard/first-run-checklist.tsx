@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import type { DashboardStats } from "@/types/database";
 
 export function FirstRunChecklist({ stats }: { stats: DashboardStats }) {
+  const roomsMissing = stats.totalRooms === 0;
   const items = [
     { label: "Create account", done: true },
     { label: "Add property", done: stats.totalProperties > 0 },
@@ -17,11 +18,13 @@ export function FirstRunChecklist({ stats }: { stats: DashboardStats }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your property is ready.</CardTitle>
+        <CardTitle>{roomsMissing ? "Complete room setup" : "Your property is ready."}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm leading-[22px] text-muted-foreground">
-          Next step: add your first resident so occupancy and collections start updating.
+          {roomsMissing
+            ? "Rooms & beds setup is incomplete. Add rooms so you can assign residents and track occupancy."
+            : "Next step: add your first resident so occupancy and collections start updating."}
         </p>
         <Progress value={(doneCount / items.length) * 100} />
         <p className="text-xs text-muted-foreground">{doneCount} of {items.length} complete</p>
@@ -33,9 +36,15 @@ export function FirstRunChecklist({ stats }: { stats: DashboardStats }) {
             </li>
           ))}
         </ul>
-        <Button asChild>
-          <Link href="/residents/new">Add your first resident</Link>
-        </Button>
+        {roomsMissing ? (
+          <Button asChild>
+            <Link href="/rooms">Add Rooms & Beds</Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href="/residents/new">Add your first resident</Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

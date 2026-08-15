@@ -1,31 +1,52 @@
 import { z } from "zod";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/auth/password-policy";
+
+const passwordField = z.string().superRefine((value, ctx) => {
+  if (!validatePassword(value).valid) {
+    ctx.addIssue({ code: "custom", message: PASSWORD_POLICY_MESSAGE });
+  }
+});
 
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    password: passwordField,
+    confirm_password: z.string().min(1, "Confirm your password"),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: "Passwords do not match.",
+    path: ["confirm_password"],
+  });
 
 export const signupSchema = z
   .object({
     full_name: z.string().min(2, "Full name is required"),
     organization_name: z.string().min(2, "Business name is required"),
     email: z.string().email("Enter a valid email"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirm_password: z.string().min(8, "Confirm your password"),
+    password: passwordField,
+    confirm_password: z.string().min(1, "Confirm your password"),
     phone: z.string().regex(/^\d{10}$/, "Enter a valid 10-digit mobile number"),
   })
   .refine((data) => data.password === data.confirm_password, {
-    message: "Passwords do not match",
+    message: "Passwords do not match.",
     path: ["confirm_password"],
   });
 
 export const propertySchema = z.object({
-  name: z.string().min(2, "Property name is required"),
+  name: z.string().trim().min(2, "Property name is required").max(120),
   internal_code: z.string().optional(),
-  address_line: z.string().min(5, "Address is required"),
-  city: z.string().min(2, "City is required"),
-  state: z.string().min(2, "State is required"),
-  pincode: z.string().regex(/^\d{6}$/, "Enter valid 6-digit pincode"),
+  address_line: z.string().trim().min(5, "Address is required").max(200),
+  city: z.string().trim().min(2, "City is required").max(80),
+  state: z.string().trim().min(2, "State is required").max(80),
+  pincode: z.string().trim().regex(/^\d{6}$/, "Enter valid 6-digit pincode"),
   contact_phone: z.string().regex(/^\d{10}$/, "Enter valid 10-digit mobile").optional().or(z.literal("")),
   status: z.enum(["active", "inactive", "maintenance"]),
   floor_count: z.coerce.number().min(1).max(50),
@@ -36,7 +57,7 @@ export const propertySchema = z.object({
 export const roomSchema = z.object({
   property_id: z.string().uuid(),
   floor_id: z.string().uuid().optional().nullable(),
-  room_number: z.string().min(1, "Room number is required"),
+  room_number: z.string().trim().min(1, "Room number is required").max(40),
   room_type: z.enum(["single", "double", "triple", "dorm", "other"]),
   bed_capacity: z.coerce.number().min(1).max(20),
   monthly_rent: z.coerce.number().min(0),

@@ -1,73 +1,77 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { AwaaslyMark } from "@/components/brand/awaasly-mark";
 
-const sizes = {
-  sm: { mark: "h-[28px] w-auto translate-y-px", word: "text-[17px] leading-none", tag: "text-[10px] leading-tight", gap: "gap-2.5" },
-  md: { mark: "h-9 w-auto translate-y-px", word: "text-xl leading-none", tag: "text-xs", gap: "gap-2.5" },
-  lg: { mark: "h-12 w-auto", word: "text-2xl leading-none", tag: "text-sm", gap: "gap-3" },
+const variantSrc = {
+  primary: "/brand/awaasly-logo-primary.png",
+  primaryTagline: "/brand/awaasly-logo-primary-tagline.png",
+  reversed: "/brand/awaasly-logo-reversed.png",
+  reversedTagline: "/brand/awaasly-logo-reversed-tagline.png",
+  stacked: "/brand/awaasly-logo-stacked.png",
+  stackedReversed: "/brand/awaasly-logo-stacked-reversed.png",
+  symbol: "/brand/awaasly-symbol-amber.svg",
 } as const;
 
-type LogoVariant = "primary" | "reversed" | "monoDark" | "monoLight" | "icon" | "stacked";
-type LogoSize = keyof typeof sizes;
+const variantSize = {
+  primary: { width: 1592, height: 396 },
+  primaryTagline: { width: 1592, height: 580 },
+  reversed: { width: 1592, height: 396 },
+  reversedTagline: { width: 1592, height: 580 },
+  stacked: { width: 1104, height: 900 },
+  stackedReversed: { width: 1104, height: 900 },
+  symbol: { width: 64, height: 64 },
+} as const;
 
-const markFill: Record<LogoVariant, string> = {
-  primary: "#F4B942",
-  reversed: "#F4B942",
-  monoDark: "#24221F",
-  monoLight: "#FFF9EC",
-  icon: "#F4B942",
-  stacked: "#F4B942",
-};
+const placementClass = {
+  navbar: "h-[26px] w-auto md:h-[30px]",
+  sidebar: "h-[30px] w-auto",
+  sidebarCollapsed: "h-[30px] w-[30px]",
+  preview: "h-[23px] w-auto",
+  auth: "h-auto w-[200px]",
+  footer: "h-auto w-[200px]",
+  icon: "h-[30px] w-[30px]",
+} as const;
 
-const wordClass: Record<LogoVariant, string> = {
-  primary: "text-foreground",
-  reversed: "text-sidebar-foreground",
-  monoDark: "text-foreground",
-  monoLight: "text-[#FFF9EC]",
-  icon: "text-foreground",
-  stacked: "text-foreground",
-};
+export type AwaaslyLogoVariant = keyof typeof variantSrc;
+export type AwaaslyLogoPlacement = keyof typeof placementClass;
 
 export function AwaaslyLogo({
   variant = "primary",
-  size = "md",
-  showTagline = false,
+  placement = "navbar",
   className,
+  alt = "Awaasly",
+  priority = false,
 }: {
-  variant?: LogoVariant;
-  size?: LogoSize;
-  showTagline?: boolean;
+  variant?: AwaaslyLogoVariant;
+  placement?: AwaaslyLogoPlacement;
   className?: string;
+  alt?: string;
+  priority?: boolean;
 }) {
-  const s = sizes[size];
-  const mark = <AwaaslyMark className={s.mark} fill={markFill[variant]} />;
+  const resolvedVariant: AwaaslyLogoVariant =
+    placement === "sidebarCollapsed" || placement === "icon" ? "symbol" : variant;
+  const src = variantSrc[resolvedVariant];
+  const size = variantSize[resolvedVariant];
+  const classes = cn("object-contain", placementClass[placement], className);
 
-  if (variant === "icon") {
-    return mark;
-  }
-
-  const wordmark = (
-    <span className="flex min-w-0 flex-col justify-center">
-      <span className={cn("font-semibold tracking-tight", s.word, wordClass[variant])}>Awaasly</span>
-      {showTagline ? (
-        <span className={cn("mt-0.5 font-normal text-muted-foreground", s.tag)}>Every property. One place.</span>
-      ) : null}
-    </span>
-  );
-
-  if (variant === "stacked") {
+  if (resolvedVariant === "symbol") {
     return (
-      <span className={cn("inline-flex flex-col items-center text-center", s.gap, className)}>
-        {mark}
-        {wordmark}
-      </span>
+      // SVG: native img avoids Next Image rasterization of the canonical mark.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt} width={30} height={30} className={classes} />
     );
   }
 
+  const sizedByWidth = placement === "auth" || placement === "footer";
+
   return (
-    <span className={cn("inline-flex items-center", s.gap, className)}>
-      {mark}
-      {wordmark}
-    </span>
+    <Image
+      src={src}
+      alt={alt}
+      width={size.width}
+      height={size.height}
+      className={classes}
+      style={sizedByWidth ? { height: "auto" } : { width: "auto" }}
+      priority={priority}
+    />
   );
 }

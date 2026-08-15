@@ -6,17 +6,24 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema } from "@/lib/validations/schemas";
 import { toUserError } from "@/lib/user-error";
+import { authCallbackUrl } from "@/lib/app-url";
+import { validatePassword } from "@/lib/auth/password-policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordField } from "@/features/auth/password-field";
+import { PasswordChecklist } from "@/features/auth/password-checklist";
 
 export function SignupForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
 
@@ -36,13 +43,18 @@ export function SignupForm() {
       return;
     }
 
-    const origin = window.location.origin;
+    if (!validatePassword(parsed.data.password).valid || parsed.data.password !== parsed.data.confirm_password) {
+      setError(parsed.data.password !== parsed.data.confirm_password ? "Passwords do not match." : "Choose a stronger password that meets all the requirements below.");
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+        emailRedirectTo: authCallbackUrl("/onboarding"),
         data: {
           full_name: parsed.data.full_name,
           organization_name: parsed.data.organization_name,
@@ -90,11 +102,21 @@ export function SignupForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" />
+          <PasswordField id="password" name="password" autoComplete="new-password" value={password} onChange={setPassword} />
+          <PasswordChecklist password={password} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm_password">Confirm Password</Label>
-          <Input id="confirm_password" name="confirm_password" type="password" required minLength={8} autoComplete="new-password" />
+          <PasswordField
+            id="confirm_password"
+            name="confirm_password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+          />
+          {confirmPassword && confirmPassword !== password ? (
+            <p className="text-sm text-destructive" role="alert">Passwords do not match.</p>
+          ) : null}
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <Button type="submit" className="w-full" disabled={loading}>

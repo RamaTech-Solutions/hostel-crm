@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { getAppUrl } from "@/lib/app-url";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_APP_URL || "https://hostel-crm.vercel.app";
+  const base = getAppUrl();
   return {
     rules: { userAgent: "*", allow: "/", disallow: ["/dashboard", "/onboarding", "/api/"] },
     sitemap: `${base}/sitemap.xml`,

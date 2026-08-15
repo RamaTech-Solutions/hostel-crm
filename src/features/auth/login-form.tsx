@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toUserError } from "@/lib/user-error";
+import { isSafeNextPath } from "@/lib/app-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordField } from "@/features/auth/password-field";
+import { ResendConfirmation } from "@/features/auth/resend-confirmation";
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,25 +18,32 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const demoUnavailable = searchParams.get("error") === "demo";
   const authLinkError = searchParams.get("error") === "auth";
+  const sessionExpired = searchParams.get("error") === "session";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
+    setUnconfirmed(false);
 
     const supabase = createClient();
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError(toUserError(authError.message, "Email or password is incorrect."));
+      const mapped = toUserError(authError.message, "The email or password is incorrect.");
+      setError(mapped);
+      setUnconfirmed(mapped.includes("confirm your email"));
       setLoading(false);
       return;
     }
 
-    router.push("/dashboard");
+    const next = searchParams.get("next");
+    router.push(isSafeNextPath(next) ? next : "/dashboard");
     router.refresh();
   }
 
@@ -52,20 +62,25 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="email"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="password">Password</Label>
+            <Link href="/forgot-password" className="text-xs font-medium text-foreground underline-offset-4 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <PasswordField id="password" name="password" autoComplete="current-password" value={password} onChange={setPassword} />
         </div>
+        {sessionExpired && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Your session has expired. Please sign in again.
+          </p>
+        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        {unconfirmed ? <ResendConfirmation email={email} /> : null}
         {demoUnavailable && (
           <p className="text-sm text-destructive" role="alert">Demo is temporarily unavailable. Please try again.</p>
         )}

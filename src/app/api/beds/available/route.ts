@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, canAccessProperty } from "@/lib/auth/get-user";
+import { classifyBed } from "@/lib/inventory/occupancy";
 
 export async function GET(request: Request) {
   const user = await getAuthUser();
@@ -13,11 +14,27 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("beds")
-    .select("id, bed_label, room:rooms(id, room_number, monthly_rent)")
-    .eq("property_id", propertyId)
-    .eq("status", "available");
+  const [{ data: beds }, { data: assignments }] = await Promise.all([
+    supabase
+      .from("beds")
+      .select("id, bed_label, status, room:rooms(id, room_number, monthly_rent)")
+      .eq("property_id", propertyId),
+    supabase
+      .from("bed_assignments")
+      .select("bed_id")
+      .eq("property_id", propertyId)
+      .eq("is_active", true)
+      .is("end_date", null),
+  ]);
 
-  return NextResponse.json({ beds: data ?? [] });
+  const active = new Set((assignments ?? []).map((row) => row.bed_id));
+  const vacant = (beds ?? []).filter(
+    (bed) =>
+      classifyBed({
+        status: bed.status,
+        hasActiveAssignment: active.has(bed.id),
+      }) === "vacant"
+  );
+
+  return NextResponse.json({ beds: vacant });
 }

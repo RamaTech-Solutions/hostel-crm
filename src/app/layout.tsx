@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { getAppUrl } from "@/lib/app-url";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hostel-crm.vercel.app";
+const appUrl = getAppUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -18,8 +19,14 @@ export const metadata: Metadata = {
   description: "PG & Hostel Operations Platform. Manage properties, rooms, residents and collections from one place. A product of Ramatech Innovation Pvt Ltd.",
   applicationName: "Awaasly",
   icons: {
-    icon: "/brand/favicon.svg",
-    shortcut: "/brand/favicon.svg",
+    icon: [
+      { url: "/brand/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/brand/favicon.ico" },
+    ],
+    shortcut: "/brand/favicon.ico",
+    apple: "/brand/apple-touch-icon.png",
   },
   openGraph: {
     title: "Awaasly — Run all your PGs from one place",

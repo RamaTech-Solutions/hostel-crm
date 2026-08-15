@@ -35,8 +35,9 @@ export type PaymentWithRelations = Payment & {
 };
 
 export type BedWithRelations = Bed & {
-  property?: { name: string };
+  property?: { id?: string; name: string; status?: string };
   room?: { room_number: string };
+  hasActiveAssignment?: boolean;
 };
 
 export type RoomWithBeds = Omit<Room, "beds"> & {
@@ -44,6 +45,41 @@ export type RoomWithBeds = Omit<Room, "beds"> & {
 };
 
 import { startOfMonth, endOfMonth, format } from "date-fns";
+import { summarizeOccupancy } from "@/lib/inventory/occupancy";
+
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
+async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
+  if (!propertyIds.length) {
+    return { beds: [] as { id: string; property_id: string; status: string; hasActiveAssignment: boolean }[], summary: summarizeOccupancy([]) };
+  }
+
+  const [{ data: beds }, { data: assignments }] = await Promise.all([
+    supabase.from("beds").select("id, status, property_id").in("property_id", propertyIds),
+    supabase
+      .from("bed_assignments")
+      .select("bed_id")
+      .in("property_id", propertyIds)
+      .eq("is_active", true)
+      .is("end_date", null),
+  ]);
+
+  const active = new Set((assignments ?? []).map((row) => row.bed_id));
+  const occupancyBeds = (beds ?? []).map((bed) => ({
+    id: bed.id,
+    property_id: bed.property_id,
+    status: bed.status,
+    hasActiveAssignment: active.has(bed.id),
+  }));
+  return { beds: occupancyBeds, summary: summarizeOccupancy(occupancyBeds) };
+}
+
+async function activePropertyIds(supabase: ServerSupabase, user: AuthUser) {
+  let query = supabase.from("properties").select("id").eq("status", "active");
+  if (user.role !== "owner") query = query.in("id", user.assignedPropertyIds);
+  const { data } = await query;
+  return (data ?? []).map((row) => row.id);
+}
 
 export async function logActivity(
   organizationId: string,
@@ -66,30 +102,22 @@ export async function logActivity(
 
 export async function getDashboardStats(user: AuthUser): Promise<DashboardStats> {
   const supabase = await createClient();
-  const propertyFilter =
-    user.role === "owner"
-      ? undefined
-      : user.assignedPropertyIds;
+  const propertyFilter = await activePropertyIds(supabase, user);
 
-  let propertiesQuery = supabase.from("properties").select("id", { count: "exact" });
-  if (propertyFilter?.length) propertiesQuery = propertiesQuery.in("id", propertyFilter);
-  const { count: totalProperties } = await propertiesQuery;
+  const { count: totalRooms } = propertyFilter.length
+    ? await supabase.from("rooms").select("id", { count: "exact", head: true }).in("property_id", propertyFilter)
+    : { count: 0 };
 
-  let roomsQuery = supabase.from("rooms").select("id", { count: "exact" });
-  if (propertyFilter?.length) roomsQuery = roomsQuery.in("property_id", propertyFilter);
-  const { count: totalRooms } = await roomsQuery;
-
-  let bedsQuery = supabase.from("beds").select("id, status");
-  if (propertyFilter?.length) bedsQuery = bedsQuery.in("property_id", propertyFilter);
-  const { data: beds } = await bedsQuery;
-  const totalBeds = beds?.length ?? 0;
-  const occupiedBeds = beds?.filter((b) => b.status === "occupied").length ?? 0;
-  const vacantBeds = beds?.filter((b) => b.status === "available").length ?? 0;
+  const occupancy = await occupancyBedsForProperties(supabase, propertyFilter);
+  const totalBeds = occupancy.summary.total;
+  const occupiedBeds = occupancy.summary.occupied;
+  const vacantBeds = occupancy.summary.vacant;
 
   let residentsQuery = supabase
     .from("residents")
     .select("id, status, monthly_rent, joining_date, planned_checkout_date, security_deposit_amount");
-  if (propertyFilter?.length) residentsQuery = residentsQuery.in("property_id", propertyFilter);
+  if (propertyFilter.length) residentsQuery = residentsQuery.in("property_id", propertyFilter);
+  else residentsQuery = residentsQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
   const { data: residents } = await residentsQuery;
 
   const activeResidents = residents?.filter((r) => r.status === "active" || r.status === "notice_period").length ?? 0;
@@ -127,7 +155,8 @@ export async function getDashboardStats(user: AuthUser): Promise<DashboardStats>
     .eq("payment_type", "rent")
     .gte("rent_month", rentMonth)
     .lte("rent_month", rentMonth);
-  if (propertyFilter?.length) paymentsQuery = paymentsQuery.in("property_id", propertyFilter);
+  if (propertyFilter.length) paymentsQuery = paymentsQuery.in("property_id", propertyFilter);
+  else paymentsQuery = paymentsQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
   const { data: payments } = await paymentsQuery;
 
   const rentCollected =
@@ -138,12 +167,12 @@ export async function getDashboardStats(user: AuthUser): Promise<DashboardStats>
   const outstandingRent = Math.max(0, monthlyRentExpected - rentCollected);
 
   return {
-    totalProperties: totalProperties ?? 0,
+    totalProperties: propertyFilter.length,
     totalRooms: totalRooms ?? 0,
     totalBeds,
     occupiedBeds,
     vacantBeds,
-    occupancyPercent: totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0,
+    occupancyPercent: occupancy.summary.occupancyPercent,
     activeResidents,
     joiningThisMonth,
     leavingThisMonth,
@@ -162,14 +191,10 @@ export async function getPropertyStats(propertyId: string): Promise<PropertyStat
     .select("id", { count: "exact" })
     .eq("property_id", propertyId);
 
-  const { data: beds } = await supabase
-    .from("beds")
-    .select("id, status")
-    .eq("property_id", propertyId);
-
-  const totalBeds = beds?.length ?? 0;
-  const occupiedBeds = beds?.filter((b) => b.status === "occupied").length ?? 0;
-  const availableBeds = beds?.filter((b) => b.status === "available").length ?? 0;
+  const occupancy = await occupancyBedsForProperties(supabase, [propertyId]);
+  const totalBeds = occupancy.summary.total;
+  const occupiedBeds = occupancy.summary.occupied;
+  const availableBeds = occupancy.summary.vacant;
 
   const { data: residents } = await supabase
     .from("residents")
@@ -200,7 +225,7 @@ export async function getPropertyStats(propertyId: string): Promise<PropertyStat
     monthlyExpectedRevenue,
     collectedRent,
     pendingRent: Math.max(0, monthlyExpectedRevenue - collectedRent),
-    occupancyPercent: totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0,
+    occupancyPercent: occupancy.summary.occupancyPercent,
   };
 }
 
@@ -212,17 +237,15 @@ export async function getOccupancyByProperty(user: AuthUser) {
 
   const results = [];
   for (const prop of properties ?? []) {
-    const { data: beds } = await supabase
-      .from("beds")
-      .select("status")
-      .eq("property_id", prop.id);
-    const total = beds?.length ?? 0;
-    const occupied = beds?.filter((b) => b.status === "occupied").length ?? 0;
+    const occupancy = await occupancyBedsForProperties(supabase, [prop.id]);
     results.push({
       name: prop.name,
-      occupancy: total > 0 ? Math.round((occupied / total) * 100) : 0,
-      occupied,
-      total,
+      occupancy: occupancy.summary.occupancyPercent,
+      occupied: occupancy.summary.occupied,
+      total: occupancy.summary.total,
+      vacant: occupancy.summary.vacant,
+      unavailable: occupancy.summary.unavailable,
+      capacity: occupancy.summary.capacity,
     });
   }
   return results;
@@ -252,15 +275,32 @@ export async function getNotifications(user: AuthUser, limit = 10): Promise<Noti
   return (data ?? []) as Notification[];
 }
 
-export async function getProperties(user: AuthUser): Promise<Property[]> {
+export async function getProperties(
+  user: AuthUser,
+  options?: { includeInactive?: boolean }
+): Promise<Property[]> {
   const supabase = await createClient();
   let query = supabase
     .from("properties")
     .select("*, manager:profiles!properties_manager_id_fkey(full_name, email)")
     .order("name");
   if (user.role !== "owner") query = query.in("id", user.assignedPropertyIds);
+  if (!options?.includeInactive) query = query.eq("status", "active");
   const { data } = await query;
   return (data ?? []) as Property[];
+}
+
+export async function getPropertyOccupancyMap(propertyIds: string[]) {
+  const supabase = await createClient();
+  const { beds } = await occupancyBedsForProperties(supabase, propertyIds);
+  const byProperty = new Map<string, ReturnType<typeof summarizeOccupancy>>();
+  for (const id of propertyIds) {
+    byProperty.set(
+      id,
+      summarizeOccupancy(beds.filter((bed) => bed.property_id === id))
+    );
+  }
+  return { byProperty };
 }
 
 export async function getProperty(propertyId: string): Promise<Property | null> {
@@ -302,6 +342,7 @@ export async function getRoomsWithBeds(propertyId: string): Promise<RoomWithBeds
             .select("*, resident:residents(id, full_name, mobile, status)")
             .eq("bed_id", bed.id)
             .eq("is_active", true)
+            .is("end_date", null)
             .maybeSingle();
           return { ...bed, assignment };
         })
@@ -450,15 +491,24 @@ export async function globalSearch(user: AuthUser, query: string) {
   };
 }
 
-export async function getAllBeds(user: AuthUser): Promise<BedWithRelations[]> {
+export async function getAllBeds(user: AuthUser, propertyId?: string): Promise<BedWithRelations[]> {
   const supabase = await createClient();
-  let query = supabase
+  const ids = await activePropertyIds(supabase, user);
+  const scoped = propertyId && ids.includes(propertyId) ? [propertyId] : ids;
+  if (!scoped.length) return [];
+
+  const { data } = await supabase
     .from("beds")
-    .select("*, room:rooms(room_number), property:properties(name)")
+    .select("*, room:rooms(room_number), property:properties(id, name, status)")
+    .in("property_id", scoped)
     .order("status");
-  if (user.role !== "owner") query = query.in("property_id", user.assignedPropertyIds);
-  const { data } = await query;
-  return (data ?? []) as BedWithRelations[];
+
+  const { beds: occupancyBeds } = await occupancyBedsForProperties(supabase, scoped);
+  const active = new Set(occupancyBeds.filter((bed) => bed.hasActiveAssignment).map((bed) => bed.id));
+  return ((data ?? []) as BedWithRelations[]).map((bed) => ({
+    ...bed,
+    hasActiveAssignment: active.has(bed.id),
+  }));
 }
 
 export async function getPayments(user: AuthUser, filters?: { propertyId?: string; status?: string }): Promise<PaymentWithRelations[]> {
