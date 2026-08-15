@@ -22,7 +22,10 @@ Residents with `property_id IS NULL` are **owner-only**.
 Helpers:
 
 - `get_user_role()` — role for the user’s current organization (join on `profiles.organization_id`)
-- `can_user_write()` — owner or property_admin
+- `can_user_write()` — owner or property_admin **and not a demo org** (`can_mutate_tenant()`)
+- `can_user_own()` — owner **and not a demo org**
+
+Demo org (`organizations.is_demo`): no persistent business writes except logout / start own workspace. See [AWAASLY_PRODUCTION_HARDENING.md](./AWAASLY_PRODUCTION_HARDENING.md).
 
 Viewers: SELECT on assigned properties; no INSERT/UPDATE/DELETE on operational data.
 
@@ -32,7 +35,7 @@ Sprint 3 inventory matrix (enforced in RLS, not only UI):
 - **property_admin:** room and bed writes on assigned properties; cannot update properties or floors
 - **viewer:** read only
 
-`properties_update` and `floors_*` write policies require `get_user_role() = 'owner'`. `rooms_*` and `beds_*` writes still use `can_user_write()` plus assigned `property_id`.
+`properties_update` and `floors_*` write policies require `can_user_own()`. `rooms_*` and `beds_*` writes still use `can_user_write()` plus assigned `property_id`.
 
 ## Storage isolation
 

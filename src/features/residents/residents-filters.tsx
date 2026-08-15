@@ -17,6 +17,7 @@ export function ResidentsFilters({ properties }: { properties: Property[] }) {
     const params = new URLSearchParams(searchParams.toString());
     if (value && value !== "all") params.set(key, value);
     else params.delete(key);
+    params.delete("page");
     router.push(`/residents?${params.toString()}`);
   }
 

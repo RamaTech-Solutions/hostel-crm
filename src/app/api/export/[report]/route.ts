@@ -42,7 +42,7 @@ export async function GET(
       break;
     }
     case "residents": {
-      const data = await getResidents(user, { status: "staying" });
+      const { rows: data } = await getResidents(user, { status: "staying" });
       csv = toCsv([
         ["Name", "Mobile", "Property", "Joining Date", "Monthly Rent"],
         ...data.map((r) => [
@@ -57,7 +57,7 @@ export async function GET(
       break;
     }
     case "payments": {
-      const data = await getPayments(user);
+      const { rows: data } = await getPayments(user);
       csv = toCsv([
         ["Date", "Resident", "Property", "Amount", "Status", "Method"],
         ...data.map((p) => [
@@ -93,8 +93,10 @@ export async function GET(
 
   return new NextResponse(csv, {
     headers: {
-      "Content-Type": "text/csv",
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { archiveProperty, reactivateProperty } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/ui/confirm-action";
 import { toast } from "sonner";
 
 export function PropertyArchiveActions({
@@ -17,9 +18,6 @@ export function PropertyArchiveActions({
   const [loading, setLoading] = useState(false);
 
   async function archive() {
-    if (!window.confirm("Archive this property? Floors, rooms, beds and history stay saved. You can reactivate it later.")) {
-      return;
-    }
     setLoading(true);
     const result = await archiveProperty(propertyId);
     if (result.error) toast.error(result.error);
@@ -50,8 +48,17 @@ export function PropertyArchiveActions({
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" disabled={loading} onClick={archive}>
-      {loading ? "Working..." : "Archive Property"}
-    </Button>
+    <ConfirmAction
+      title="Archive this property?"
+      description="Floors, rooms, beds and history stay saved. You can reactivate it later. Occupancy and new assignments stop for this property."
+      confirmLabel="Archive property"
+      pending={loading}
+      onConfirm={archive}
+      trigger={
+        <Button type="button" variant="outline" size="sm" disabled={loading}>
+          {loading ? "Working..." : "Archive Property"}
+        </Button>
+      }
+    />
   );
 }

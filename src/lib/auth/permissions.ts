@@ -1,11 +1,22 @@
 import type { AuthUser } from "@/types/database";
 
+export const DEMO_READ_ONLY =
+  "Demo workspace is read-only. Start your own workspace to make changes.";
+
+export function canMutateTenant(user: AuthUser): boolean {
+  return !user.organization.is_demo;
+}
+
 export function canWrite(user: AuthUser): boolean {
-  return user.role === "owner" || user.role === "property_admin";
+  return canMutateTenant(user) && (user.role === "owner" || user.role === "property_admin");
 }
 
 export function isOwner(user: AuthUser): boolean {
   return user.role === "owner";
+}
+
+export function canOwn(user: AuthUser): boolean {
+  return canMutateTenant(user) && user.role === "owner";
 }
 
 export function canAccessProperty(user: AuthUser, propertyId: string): boolean {

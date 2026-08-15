@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { getAuthUser, canAccessProperty, canWrite, isOwner } from "@/lib/auth/get-user";
+import { getAuthUser, canAccessProperty, canWrite, canOwn } from "@/lib/auth/get-user";
 import { getProperty, getPropertyStats, getRoomsWithBeds, getFloors, getProperties } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatCard, StatCardCurrency } from "@/components/ui/stat-card";
@@ -63,7 +63,7 @@ export default async function PropertyDetailPage({
         <div className="flex flex-col gap-2 sm:items-end">
           <PropertySwitcher properties={switcherProperties} currentId={propertyId} basePath="/properties" />
           <div className="flex flex-wrap gap-2">
-            {isOwner(user) ? (
+            {canOwn(user) ? (
               <>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/properties/${propertyId}/edit`}>Edit property</Link>
@@ -92,7 +92,7 @@ export default async function PropertyDetailPage({
         floors={floors}
         rooms={rooms}
         canWriteRooms={canWrite(user)}
-        canManageFloors={isOwner(user)}
+        canManageFloors={canOwn(user)}
       />
     </div>
   );

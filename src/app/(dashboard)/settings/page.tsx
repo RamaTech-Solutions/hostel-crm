@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAuthUser, isOwner } from "@/lib/auth/get-user";
+import { getAuthUser, isOwner, canOwn } from "@/lib/auth/get-user";
 import { getTeamMembers } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,7 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
-        {isOwner(user) && (
+        {canOwn(user) && (
           <Card>
             <CardHeader><CardTitle className="text-base">Rent due day</CardTitle></CardHeader>
             <CardContent className="space-y-3">

@@ -12,7 +12,7 @@ export default async function PaymentsReportPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const payments = await getPayments(user);
+  const { rows: payments } = await getPayments(user);
 
   return (
     <div>

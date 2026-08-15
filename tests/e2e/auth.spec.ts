@@ -60,8 +60,11 @@ test.describe("Awaasly", () => {
     await expect(page).toHaveURL(/login/);
   });
 
-  test("document content is not public", async ({ page }) => {
-    await page.goto("/api/documents/33333333-3333-4333-8333-333333333333/content");
-    await expect(page).toHaveURL(/login/);
+  test("document content is not public", async ({ request }) => {
+    const response = await request.get("/api/documents/33333333-3333-4333-8333-333333333333/content");
+    expect(response.status()).toBe(401);
+    expect(response.headers()["content-type"] ?? "").toMatch(/json/);
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
   });
 });

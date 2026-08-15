@@ -1,81 +1,115 @@
 # Awaasly deployment runbook
 
-## Vercel environment variables (names only)
+## Environment split (Sprint 8.1)
 
-Required (already used):
+| Environment | Supabase | Demo login | Public conversion |
+|---|---|---|---|
+| Local | Staging (`pg-crm-demo`) | Yes | `NEXT_PUBLIC_PRIMARY_APP_URL`/signup when set |
+| Vercel Preview | Staging | Yes | Same |
+| Vercel Production | **New empty production project** | No (`DEMO_OWNER_*` omitted) | `/signup` on this host |
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_APP_URL` — production site URL, e.g. `https://hostel-crm.vercel.app` (Auth email redirects)
-- `DEMO_OWNER_EMAIL`
-- `DEMO_OWNER_PASSWORD`
+Do not copy staging rows into production. Never `supabase db reset --linked`. Never put `SUPABASE_SERVICE_ROLE_KEY` on Vercel or as `NEXT_PUBLIC_*`.
 
-Optional / local seed only (do **not** add to the browser):
+### Public journey
 
-- `SUPABASE_SERVICE_ROLE_KEY`
+Production landing **Explore Demo** → `NEXT_PUBLIC_DEMO_URL` (stable staging `/demo`) → staging Supabase.
 
-Supabase Auth URL config (Dashboard, not Vercel):
+Staging demo **Start Free** → `NEXT_PUBLIC_PRIMARY_APP_URL/signup` → production Supabase.
 
-- Site URL = production origin
-- Redirect allow list includes `https://hostel-crm.vercel.app/auth/callback` and local `http://localhost:3000/auth/callback`
+## Environment variable names
 
-## Git
+See [`.env.example`](../.env.example). Scopes:
 
-Base SHA: `951dbbf536afe46832c7c4377b8b6298c5bdad98`  
-Branch: `feat/awaasly-saas-foundation`
+- **Preview / Development:** staging `NEXT_PUBLIC_SUPABASE_URL` + anon; `NEXT_PUBLIC_APP_URL` = **stable staging origin** (never the production hostname); `DEMO_OWNER_EMAIL` / `DEMO_OWNER_PASSWORD`; `NEXT_PUBLIC_PRIMARY_APP_URL` = production origin. No service role.
+- **Production:** production URL + anon; `NEXT_PUBLIC_APP_URL` = `https://hostel-crm.vercel.app`; `NEXT_PUBLIC_DEMO_URL` = `https://<stable-staging>/demo`. Omit demo email/password and service role.
 
-Deploy by merging/pushing this branch so Vercel builds `main` or the preview.
+`getAppUrl()` does not fall back to `https://hostel-crm.vercel.app`. Set `NEXT_PUBLIC_APP_URL` on every deploy.
 
-## Database apply (linked project only)
+## Stable staging origin
 
-Never run `supabase db reset --linked`.
+Preferred: a dedicated Git branch named `staging` (not a one-off Preview hash).
 
-Never re-apply `supabase/legacy/*.sql` or `20260814120000_baseline_existing_production.sql` on production.
+In Vercel (manual):
+
+1. Create and push branch `staging` from the release branch.
+2. Project → Settings → Environments: add **Staging** (or assign Preview) to branch `staging`.
+3. Project → Settings → Domains: give that branch a **stable** hostname (do not copy a random `*-git-*-commit*.vercel.app` Preview URL).
+4. Use that origin as Staging Auth Site URL, Preview `NEXT_PUBLIC_APP_URL`, and Production `NEXT_PUBLIC_DEMO_URL` (`…/demo`).
+
+Also allowlist `http://localhost:3000/auth/callback` and extra Preview callbacks if needed.
+
+Do not invent the hostname. Record it in this runbook after it exists.
+
+## Identify the CLI target (project ref)
+
+Before any remote mutation:
 
 ```bash
-# 1. Backup (gitignored)
-mkdir -p backups/pre-saas-migration
-supabase db dump --linked -f backups/pre-saas-migration/schema.sql
-supabase db dump --linked --data-only -f backups/pre-saas-migration/data.sql
-
-# 2. Mark baseline applied if remote already has the demo schema
-supabase migration repair --status applied 20260814120000 --linked
-
-# 3. Dry-run
-supabase db push --linked --dry-run
-
-# 4. Apply 201–207 if dry-run has no unexpected DROP TABLE/SCHEMA/TYPE/TRUNCATE
-supabase db push --linked
+npx supabase projects list
+npm run supabase:target
+# also: cat supabase/.temp/project-ref   # gitignored; present with current CLI
+npx supabase db push --linked --dry-run
 ```
 
-## STOP
+Proceed only if the printed **project ref** is the intended staging or production project. Do not assume `linked-project.json`.
 
-Do not apply if backup fails, history cannot be reconciled, dry-run drops unexpected objects, or you cannot tell local vs linked.
+## Greenfield migration rehearsal (required before new production)
 
-## Smoke
-
-1. `/demo` still opens the UrbanStay dashboard  
-2. `/login` for manager and viewer  
-3. Manager cannot open another property’s residents  
-4. Disposable `/signup` cannot see demo residents  
-5. Document files stream from `/api/documents/[id]/content` (path `org/resident/document.ext`)
-
-## Local
-
-Docker Desktop must be running. If `docker` is not on PATH, use:
+Local Docker only — not linked remote:
 
 ```bash
 export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
+npx supabase start
+npx supabase db reset
 ```
 
-`supabase db lint --linked` was used against production after apply (no schema errors). `supabase start` is optional for a full local stack.
+If the full `supabase/migrations/` chain fails, **stop**. Do not edit historical migrations. Add a new forward migration only after reporting the defect.
 
-## Smoke after apply
+If local Supabase cannot run, do not initialize production; report rehearsal incomplete.
+
+**Rehearsal status (2026-08-15):** Docker Desktop available. `npx supabase start` then `npx supabase db reset` (not `--linked`) replayed the full checked-in chain through `20260815200000_demo_write_protection.sql`. CLI also ran `supabase/seed.sql` (comments only — not UrbanStay). Remote production is still uninitialized until you create the empty project.
+
+## Production initialization
+
+After rehearsal succeeds, create an empty **Awaasly Production** project by hand.
+
+1. Confirm project ref (`npm run supabase:target` after `supabase link`)
+2. `npx supabase db push --linked --dry-run`
+3. Apply if the dry-run is expected
+4. Do **not** seed, copy UrbanStay/residents/payments/documents/auth users, run `supabase/legacy/*.sql`, or `migration repair` on a truly empty project
+
+Read-only check: no customer orgs, residents, payments, rent charges, documents, or Storage objects. Then one real `/signup` on production.
+
+## Staging demo seed
+
+Staging only. Both flags required. Aborts if the URL ref is production.
 
 ```bash
-npx tsx scripts/smoke-rls.ts
+ALLOW_DEMO_SEED=1 CONFIRM_SUPABASE_PROJECT_REF=<staging-ref> npm run seed
 ```
 
-Expected: demo owner/manager/viewer login, property isolation, viewer write blocked, disposable tenant cannot see demo rows.
+Set `PRODUCTION_SUPABASE_PROJECT_REF` in `.env.local` once production exists so seed cannot hit it even with `ALLOW_DEMO_SEED=1`.
 
+## Release sequence
+
+1. `npm test`
+2. `npm run lint`
+3. `npm run build`
+4. `npm run supabase:target` — confirm ref
+5. `npx supabase db push --linked --dry-run` then apply if correct
+6. Deploy Production (production env vars)
+7. Smoke: production signup; Explore Demo opens staging; staging Start Free opens production `/signup`
+8. No seeds on production
+
+## Dependency HIGH findings (do not force-upgrade)
+
+`npm audit` reports 3 high in Next-bundled `postcss` and `sharp`. `npm audit fix --force` would install Next 16. **Do not run it in 8.1.** Revisit at the final pre-pilot gate. See [AWAASLY_PRODUCTION_HARDENING.md](./AWAASLY_PRODUCTION_HARDENING.md).
+
+## Smoke
+
+1. Staging `/demo` opens UrbanStay (read-only writes)
+2. Staging Start Free lands on production `/signup`
+3. Production Explore Demo opens stable staging `/demo`
+4. Production `/demo` without demo env does not sign in
+5. Disposable production signup cannot see staging residents

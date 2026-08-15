@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAuthUser, isOwner } from "@/lib/auth/get-user";
+import { getAuthUser, canOwn } from "@/lib/auth/get-user";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PropertyForm } from "@/features/properties/property-form";
 import { PageHeader } from "@/components/ui/page-header";
@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 export default async function NewPropertyPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
-  if (!isOwner(user)) redirect("/properties");
+  if (!canOwn(user)) redirect("/properties");
 
   return (
     <div>

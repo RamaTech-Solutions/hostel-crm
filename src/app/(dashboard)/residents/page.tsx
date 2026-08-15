@@ -15,31 +15,47 @@ import type { ResidentStatus } from "@/types/database";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, DataTableHead, DataTh, DataTableBody, DataTr, DataTd } from "@/components/ui/data-table";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { LIST_PAGE_SIZE, parsePage } from "@/lib/list-query";
 
 export default async function ResidentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ property?: string; status?: string; search?: string }>;
+  searchParams: Promise<{ property?: string; status?: string; search?: string; page?: string }>;
 }) {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
   const params = await searchParams;
-  const [residents, properties] = await Promise.all([
+  const page = parsePage(params.page);
+  const [result, properties] = await Promise.all([
     getResidents(user, {
       propertyId: params.property,
       status: params.status,
       search: params.search,
+      page,
+      pageSize: LIST_PAGE_SIZE,
     }),
     getProperties(user),
   ]);
+  const residents = result.rows;
+
+  function hrefFor(nextPage: number) {
+    const query = new URLSearchParams();
+    if (params.property) query.set("property", params.property);
+    if (params.status) query.set("status", params.status);
+    if (params.search) query.set("search", params.search);
+    if (nextPage > 1) query.set("page", String(nextPage));
+    const qs = query.toString();
+    return qs ? `/residents?${qs}` : "/residents";
+  }
 
   return (
     <div>
       <Breadcrumbs items={[{ label: "Residents" }]} />
       <PageHeader
         title="Residents"
-        description={`${residents.length} residents`}
+        description={`${result.total} residents`}
         actions={
           canWrite(user) ? (
             <Button asChild>
@@ -139,6 +155,7 @@ export default async function ResidentsPage({
               );
             })}
           </div>
+          <ListPagination page={page} pageSize={LIST_PAGE_SIZE} total={result.total} hrefFor={hrefFor} />
         </>
       )}
     </div>

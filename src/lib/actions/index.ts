@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuthUser, canWrite, canAccessProperty, canAccessResidentRecord, isOwner } from "@/lib/auth/get-user";
+import { requireAuthUser, canWrite, canOwn, canAccessProperty, canAccessResidentRecord } from "@/lib/auth/get-user";
 import { logActivity } from "@/lib/queries";
 import {
   propertySchema,
@@ -13,6 +13,7 @@ import {
   transferSchema,
 } from "@/lib/validations/schemas";
 import { toUserError } from "@/lib/user-error";
+import { getPublicSignupHref } from "@/lib/app-url";
 import { identityForPersistence } from "@/lib/residents/identity";
 import { residentCreateSchema, residentProfileEditSchema } from "@/lib/residents/validation";
 import { mapLifecycleError, RESIDENT_ERRORS } from "@/lib/residents/errors";
@@ -45,7 +46,7 @@ export async function signOut() {
 
 export async function createProperty(formData: FormData) {
   const user = await requireAuthUser();
-  if (user.role !== "owner") return { error: "Only owners can create properties" };
+  if (!canOwn(user)) return { error: "Only owners can create properties" };
 
   const parsed = propertySchema.safeParse({
     name: formData.get("name"),
@@ -86,7 +87,7 @@ export async function createProperty(formData: FormData) {
 
 export async function updateProperty(propertyId: string, formData: FormData) {
   const user = await requireAuthUser();
-  if (!canAccessProperty(user, propertyId) || !isOwner(user)) {
+  if (!canAccessProperty(user, propertyId) || !canOwn(user)) {
     return { error: "Unauthorized" };
   }
 
@@ -319,7 +320,7 @@ export async function updateRoom(roomId: string, formData: FormData) {
 
 export async function archiveProperty(propertyId: string) {
   const user = await requireAuthUser();
-  if (!isOwner(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
+  if (!canOwn(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
 
   const supabase = await createClient();
   const { data: property } = await supabase.from("properties").select("id, status").eq("id", propertyId).maybeSingle();
@@ -346,7 +347,7 @@ export async function archiveProperty(propertyId: string) {
 
 export async function reactivateProperty(propertyId: string) {
   const user = await requireAuthUser();
-  if (!isOwner(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
+  if (!canOwn(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
 
   const supabase = await createClient();
   const { error } = await supabase.from("properties").update({ status: "active" }).eq("id", propertyId);
@@ -362,7 +363,7 @@ export async function reactivateProperty(propertyId: string) {
 
 export async function deleteFloor(floorId: string, propertyId: string) {
   const user = await requireAuthUser();
-  if (!isOwner(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
+  if (!canOwn(user) || !canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
 
   const supabase = await createClient();
   const { count } = await supabase
@@ -700,7 +701,7 @@ export async function generateRentCharges(formData: FormData) {
 
 export async function voidRentCharge(formData: FormData) {
   const user = await requireAuthUser();
-  if (!isOwner(user)) return { error: FINANCE_ERRORS.voidOwner };
+  if (!canOwn(user)) return { error: FINANCE_ERRORS.voidOwner };
   const chargeId = String(formData.get("charge_id") || "");
   if (!chargeId) return { error: "Charge is required." };
 
@@ -721,7 +722,7 @@ export async function voidRentCharge(formData: FormData) {
 
 export async function updateOrgRentDueDay(formData: FormData) {
   const user = await requireAuthUser();
-  if (!isOwner(user)) return { error: FINANCE_ERRORS.dueDayOwner };
+  if (!canOwn(user)) return { error: FINANCE_ERRORS.dueDayOwner };
   const dueDay = Number(formData.get("rent_due_day"));
   const supabase = await createClient();
   const { data: rpc, error } = await supabase.rpc("update_org_rent_due_day", { p_due_day: dueDay });
@@ -889,7 +890,7 @@ export async function completeOnboardingToResidents() {
 
 async function markOnboardingComplete() {
   const user = await requireAuthUser();
-  if (user.role !== "owner") return { error: "Only owners can complete onboarding" };
+  if (!canOwn(user)) return { error: "Only owners can complete onboarding" };
 
   const completedAt = nextOnboardingCompletedAt(
     user.organization.onboarding_completed_at,
@@ -910,12 +911,12 @@ async function markOnboardingComplete() {
 export async function startOwnWorkspace() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/signup");
+  redirect(getPublicSignupHref());
 }
 
 export async function updateOnboardingWorkspace(formData: FormData) {
   const user = await requireAuthUser();
-  if (user.role !== "owner") return { error: "Only owners can update this" };
+  if (!canOwn(user)) return { error: "Only owners can update this" };
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const organizationName = String(formData.get("organization_name") ?? "").trim();
@@ -943,7 +944,7 @@ export async function updateOnboardingWorkspace(formData: FormData) {
 
 export async function setupOnboardingFloors(propertyId: string, floorCount: number) {
   const user = await requireAuthUser();
-  if (user.role !== "owner" || !canAccessProperty(user, propertyId)) {
+  if (!canOwn(user) || !canAccessProperty(user, propertyId)) {
     return { error: "Unauthorized" };
   }
   const count = Math.min(50, Math.max(1, Math.floor(floorCount)));
@@ -975,7 +976,7 @@ export async function setupOnboardingFloors(propertyId: string, floorCount: numb
 
 export async function updateFloorLabel(floorId: string, label: string, propertyId?: string) {
   const user = await requireAuthUser();
-  if (!isOwner(user)) return { error: "Unauthorized" };
+  if (!canOwn(user)) return { error: "Unauthorized" };
   const trimmed = label.trim();
   if (!trimmed) return { error: "Floor name is required" };
 
@@ -989,7 +990,7 @@ export async function updateFloorLabel(floorId: string, label: string, propertyI
 
 export async function createFloor(formData: FormData) {
   const user = await requireAuthUser();
-  if (!isOwner(user)) return { error: "Unauthorized" };
+  if (!canOwn(user)) return { error: "Unauthorized" };
 
   const propertyId = String(formData.get("property_id") ?? "");
   const requestedLabel = String(formData.get("label") ?? "").trim();
@@ -1025,7 +1026,7 @@ export async function createFloor(formData: FormData) {
 
 export async function saveOnboardingFirstProperty(formData: FormData) {
   const user = await requireAuthUser();
-  if (user.role !== "owner") return { error: "Only owners can save the first property" };
+  if (!canOwn(user)) return { error: "Only owners can save the first property" };
 
   const expectedPropertyId = String(formData.get("property_id") ?? "").trim() || null;
   const supabase = await createClient();
@@ -1062,7 +1063,7 @@ export async function saveOnboardingFirstProperty(formData: FormData) {
 
 export async function addOnboardingFloor(propertyId: string, label?: string) {
   const user = await requireAuthUser();
-  if (user.role !== "owner" || !canAccessProperty(user, propertyId)) {
+  if (!canOwn(user) || !canAccessProperty(user, propertyId)) {
     return { error: "Unauthorized" };
   }
 
@@ -1127,7 +1128,7 @@ export async function getOnboardingSummary(propertyId: string) {
 
 export async function saveOnboardingRoom(formData: FormData) {
   const user = await requireAuthUser();
-  if (user.role !== "owner") return { error: "Unauthorized" };
+  if (!canOwn(user)) return { error: "Unauthorized" };
 
   const parsed = roomSchema.safeParse({
     property_id: formData.get("property_id"),
@@ -1391,10 +1392,4 @@ export async function deleteDocument(formData: FormData) {
   revalidatePath(`/residents/${doc.resident_id}`);
   revalidatePath("/dashboard");
   return { success: true };
-}
-
-export async function markNotificationRead(notificationId: string) {
-  const supabase = await createClient();
-  await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId);
-  revalidatePath("/dashboard");
 }

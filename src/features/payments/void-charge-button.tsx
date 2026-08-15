@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { voidRentCharge } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/ui/confirm-action";
 import { toast } from "sonner";
 import { canVoidCharge } from "@/lib/finance/period";
 
@@ -26,13 +27,6 @@ export function VoidChargeButton({
   if (!canVoidCharge(allocatedPaid, voidedAt) || !(outstanding > 0)) return null;
 
   async function cancelCharge() {
-    if (
-      !window.confirm(
-        "Cancel this unpaid rent charge? It will be removed from collections. Payment history is not deleted."
-      )
-    ) {
-      return;
-    }
     setLoading(true);
     const form = new FormData();
     form.set("charge_id", chargeId);
@@ -47,8 +41,18 @@ export function VoidChargeButton({
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" disabled={loading} onClick={cancelCharge}>
-      {loading ? "Cancelling..." : "Cancel charge"}
-    </Button>
+    <ConfirmAction
+      title="Cancel this unpaid rent charge?"
+      description="It will be removed from collections. Payment history is not deleted."
+      confirmLabel="Cancel charge"
+      destructive
+      pending={loading}
+      onConfirm={cancelCharge}
+      trigger={
+        <Button type="button" variant="outline" size="sm" disabled={loading}>
+          {loading ? "Cancelling..." : "Cancel charge"}
+        </Button>
+      }
+    />
   );
 }

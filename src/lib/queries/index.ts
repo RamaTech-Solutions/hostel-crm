@@ -1,5 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { LIST_PAGE_SIZE, pageRange } from "@/lib/list-query";
+import { sanitizeSearchTerm } from "@/lib/search";
 import type {
   AuthUser,
   DashboardStats,
@@ -355,61 +357,70 @@ export async function getRoomsWithBeds(propertyId: string): Promise<RoomWithBeds
   return enriched as RoomWithBeds[];
 }
 
-export async function getResidents(user: AuthUser, filters?: {
-  propertyId?: string;
-  status?: string;
-  search?: string;
-}): Promise<Resident[]> {
+export async function getResidents(
+  user: AuthUser,
+  filters?: {
+    propertyId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }
+): Promise<{ rows: Resident[]; total: number }> {
+  if (user.role !== "owner" && !user.assignedPropertyIds.length) {
+    return { rows: [], total: 0 };
+  }
+
+  const paginate = typeof filters?.page === "number";
+  const pageSize = filters?.pageSize ?? LIST_PAGE_SIZE;
   const supabase = await createClient();
   let query = supabase
     .from("residents")
-    .select(`
+    .select(
+      `
       *,
       property:properties(id, name),
       bed_assignment:bed_assignments!fk_current_bed_assignment(
         id, bed:beds(bed_label), room:rooms(room_number)
       )
-    `)
+    `,
+      { count: "exact" }
+    )
     .order("full_name");
 
-  if (user.role !== "owner") {
-    if (!user.assignedPropertyIds.length) return [];
-    query = query.in("property_id", user.assignedPropertyIds);
-  }
+  if (user.role !== "owner") query = query.in("property_id", user.assignedPropertyIds);
   if (filters?.propertyId) query = query.eq("property_id", filters.propertyId);
   if (filters?.status === "staying") query = query.in("status", ["active", "notice_period"]);
   else if (filters?.status) query = query.eq("status", filters.status);
-  if (filters?.search) {
-    query = query.or(
-      `full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`
-    );
+  const search = sanitizeSearchTerm(filters?.search);
+  if (search) query = query.or(`full_name.ilike.%${search}%,mobile.ilike.%${search}%`);
+  if (paginate) {
+    const { from, to } = pageRange(filters!.page!, pageSize);
+    query = query.range(from, to);
   }
 
-  const { data, error } = await query;
-  if (error) {
-    console.error("getResidents error:", error.message);
-    // Fallback without nested bed join if embed fails
-    let fallback = supabase
-      .from("residents")
-      .select(`*, property:properties(id, name)`)
-      .order("full_name");
-    if (user.role !== "owner") fallback = fallback.in("property_id", user.assignedPropertyIds);
-    if (filters?.propertyId) fallback = fallback.eq("property_id", filters.propertyId);
-    if (filters?.status === "staying") fallback = fallback.in("status", ["active", "notice_period"]);
-    else if (filters?.status) fallback = fallback.eq("status", filters.status);
-    if (filters?.search) {
-      fallback = fallback.or(
-        `full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`
-      );
-    }
-    const { data: fallbackData, error: fallbackError } = await fallback;
-    if (fallbackError) {
-      console.error("getResidents fallback error:", fallbackError.message);
-      return [];
-    }
-    return (fallbackData ?? []) as Resident[];
+  const { data, error, count } = await query;
+  if (!error) {
+    const rows = (data ?? []) as Resident[];
+    return { rows, total: count ?? rows.length };
   }
-  return (data ?? []) as Resident[];
+
+  let fallback = supabase
+    .from("residents")
+    .select(`*, property:properties(id, name)`, { count: "exact" })
+    .order("full_name");
+  if (user.role !== "owner") fallback = fallback.in("property_id", user.assignedPropertyIds);
+  if (filters?.propertyId) fallback = fallback.eq("property_id", filters.propertyId);
+  if (filters?.status === "staying") fallback = fallback.in("status", ["active", "notice_period"]);
+  else if (filters?.status) fallback = fallback.eq("status", filters.status);
+  if (search) fallback = fallback.or(`full_name.ilike.%${search}%,mobile.ilike.%${search}%`);
+  if (paginate) {
+    const { from, to } = pageRange(filters!.page!, pageSize);
+    fallback = fallback.range(from, to);
+  }
+  const { data: fallbackData, count: fallbackCount } = await fallback;
+  const rows = (fallbackData ?? []) as Resident[];
+  return { rows, total: fallbackCount ?? rows.length };
 }
 
 export async function getResident(residentId: string): Promise<ResidentDetail | null> {
@@ -497,7 +508,9 @@ export async function getAvailableBeds(propertyId: string) {
 
 export async function globalSearch(user: AuthUser, query: string) {
   const supabase = await createClient();
-  const term = `%${query}%`;
+  const search = sanitizeSearchTerm(query);
+  if (!search) return { residents: [], rooms: [] };
+  const term = `%${search}%`;
 
   let residentsQuery = supabase
     .from("residents")
@@ -540,17 +553,27 @@ export async function getAllBeds(user: AuthUser, propertyId?: string): Promise<B
   }));
 }
 
-export async function getPayments(user: AuthUser, filters?: { propertyId?: string; status?: string }): Promise<PaymentWithRelations[]> {
+export async function getPayments(
+  user: AuthUser,
+  filters?: { propertyId?: string; status?: string; page?: number; pageSize?: number }
+): Promise<{ rows: PaymentWithRelations[]; total: number }> {
+  const paginate = typeof filters?.page === "number";
+  const pageSize = filters?.pageSize ?? LIST_PAGE_SIZE;
   const supabase = await createClient();
   let query = supabase
     .from("payments")
-    .select("*, resident:residents(full_name), property:properties(name)")
+    .select("*, resident:residents(full_name), property:properties(name)", { count: "exact" })
     .order("payment_date", { ascending: false });
   if (user.role !== "owner") query = query.in("property_id", user.assignedPropertyIds);
   if (filters?.propertyId) query = query.eq("property_id", filters.propertyId);
   if (filters?.status) query = query.eq("status", filters.status);
-  const { data } = await query;
-  return (data ?? []) as PaymentWithRelations[];
+  if (paginate) {
+    const { from, to } = pageRange(filters!.page!, pageSize);
+    query = query.range(from, to);
+  }
+  const { data, count } = await query;
+  const rows = (data ?? []) as PaymentWithRelations[];
+  return { rows, total: count ?? rows.length };
 }
 
 export async function getRentCharges(
@@ -569,8 +592,9 @@ export async function getRentCharges(
   if (filters.status && filters.status !== "all") query = query.eq("ledger_status", filters.status);
   const { data } = await query;
   let rows = (data ?? []) as RentChargeBalance[];
-  if (filters.search) {
-    const q = filters.search.toLowerCase();
+  const search = sanitizeSearchTerm(filters.search);
+  if (search) {
+    const q = search.toLowerCase();
     rows = rows.filter((row) => (row.resident as { full_name?: string } | undefined)?.full_name?.toLowerCase().includes(q));
   }
   return rows;

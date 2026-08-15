@@ -12,11 +12,10 @@ import { SidebarMenuButton } from "@/components/layout/sidebar";
 
 interface HeaderProps {
   userName: string;
-  notificationCount?: number;
   onMenuClick: () => void;
 }
 
-export function Header({ userName, notificationCount = 0, onMenuClick }: HeaderProps) {
+export function Header({ userName, onMenuClick }: HeaderProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
 
@@ -44,13 +43,8 @@ export function Header({ userName, notificationCount = 0, onMenuClick }: HeaderP
 
       <div className="flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="icon" className="relative" asChild>
-          <a href="/dashboard#alerts" aria-label="Notifications">
+          <a href="/dashboard#attention" aria-label="View items needing attention">
             <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
-                {notificationCount > 9 ? "9+" : notificationCount}
-              </span>
-            )}
           </a>
         </Button>
 

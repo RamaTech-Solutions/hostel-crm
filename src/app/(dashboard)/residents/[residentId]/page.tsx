@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { getAuthUser, canWrite, isOwner } from "@/lib/auth/get-user";
+import { getAuthUser, canWrite, canOwn } from "@/lib/auth/get-user";
 import {
   getResident,
   getResidentPayments,
@@ -235,7 +235,7 @@ export default async function ResidentProfilePage({
                   <span>Status</span>
                   <LedgerStatusBadge status={currentCharge.ledger_status} />
                   <span>Outstanding {formatCurrency(Number(currentCharge.outstanding))}</span>
-                  {isOwner(user) ? (
+                  {canOwn(user) ? (
                     <VoidChargeButton
                       chargeId={currentCharge.id}
                       residentId={residentId}
@@ -246,7 +246,7 @@ export default async function ResidentProfilePage({
                   ) : null}
                 </div>
               ) : null}
-              {isOwner(user) ? (
+              {canOwn(user) ? (
                 <ul className="space-y-2">
                   {charges
                     .filter(

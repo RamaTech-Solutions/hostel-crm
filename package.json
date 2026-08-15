@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "npx tsx scripts/seed.ts",
+    "supabase:target": "npx tsx scripts/print-supabase-target.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

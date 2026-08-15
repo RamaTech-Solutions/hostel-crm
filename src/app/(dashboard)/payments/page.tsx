@@ -17,12 +17,14 @@ import { LedgerStatusBadge } from "@/features/payments/ledger-status-badge";
 import { VoidChargeButton } from "@/features/payments/void-charge-button";
 import { formatPeriodLabel, isCurrentBillingMonth, monthStart, shiftMonth } from "@/lib/finance/period";
 import { IndianRupee, Wallet, AlertCircle, CalendarDays } from "lucide-react";
-import { canWrite, isOwner } from "@/lib/auth/permissions";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { LIST_PAGE_SIZE, parsePage } from "@/lib/list-query";
+import { canWrite, canOwn } from "@/lib/auth/permissions";
 
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ property?: string; status?: string; period?: string; q?: string }>;
+  searchParams: Promise<{ property?: string; status?: string; period?: string; q?: string; page?: string; rpage?: string }>;
 }) {
   const user = await getAuthUser();
   if (!user) redirect("/login");
@@ -31,8 +33,10 @@ export default async function PaymentsPage({
   const periodStart = monthStart(params.period || new Date().toISOString().slice(0, 10));
   const prev = shiftMonth(periodStart, -1);
   const next = shiftMonth(periodStart, 1);
-  const [payments, charges, summary, properties] = await Promise.all([
-    getPayments(user, { propertyId: params.property }),
+  const chargePage = parsePage(params.page);
+  const receiptPage = parsePage(params.rpage);
+  const [paymentResult, allCharges, summary, properties] = await Promise.all([
+    getPayments(user, { propertyId: params.property, page: receiptPage, pageSize: LIST_PAGE_SIZE }),
     getRentCharges(user, {
       periodStart,
       propertyId: params.property,
@@ -42,6 +46,9 @@ export default async function PaymentsPage({
     getPeriodLedgerSummary(user, periodStart, params.property),
     getProperties(user),
   ]);
+  const payments = paymentResult.rows;
+  const chargeFrom = (chargePage - 1) * LIST_PAGE_SIZE;
+  const charges = allCharges.slice(chargeFrom, chargeFrom + LIST_PAGE_SIZE);
 
   const query = new URLSearchParams();
   if (params.property) query.set("property", params.property);
@@ -50,6 +57,20 @@ export default async function PaymentsPage({
   const withPeriod = (p: string) => {
     const nextQuery = new URLSearchParams(query);
     nextQuery.set("period", p);
+    return `/payments?${nextQuery.toString()}`;
+  };
+  const chargesHref = (p: number) => {
+    const nextQuery = new URLSearchParams(query);
+    nextQuery.set("period", periodStart);
+    if (params.rpage) nextQuery.set("rpage", params.rpage);
+    if (p > 1) nextQuery.set("page", String(p));
+    return `/payments?${nextQuery.toString()}`;
+  };
+  const receiptsHref = (p: number) => {
+    const nextQuery = new URLSearchParams(query);
+    nextQuery.set("period", periodStart);
+    if (params.page) nextQuery.set("page", params.page);
+    if (p > 1) nextQuery.set("rpage", String(p));
     return `/payments?${nextQuery.toString()}`;
   };
 
@@ -120,7 +141,7 @@ export default async function PaymentsPage({
             description="Generate this month’s rent to start tracking collections. Existing receipts stay in payment history and are not auto-allocated."
             action={canWrite(user) && isCurrentBillingMonth(periodStart) ? <GenerateRentButton periodStart={periodStart} /> : undefined}
           />
-        ) : charges.length === 0 ? (
+        ) : allCharges.length === 0 ? (
           <p className="text-sm text-muted-foreground">No charges match these filters.</p>
         ) : (
           <>
@@ -133,7 +154,7 @@ export default async function PaymentsPage({
                   <DataTh>Paid</DataTh>
                   <DataTh>Outstanding</DataTh>
                   <DataTh>Status</DataTh>
-                  {isOwner(user) ? <DataTh className="w-[1%]"> </DataTh> : null}
+                  {canOwn(user) ? <DataTh className="w-[1%]"> </DataTh> : null}
                 </DataTableHead>
                 <DataTableBody>
                   {charges.map((c) => (
@@ -148,7 +169,7 @@ export default async function PaymentsPage({
                       <DataTd>{formatCurrency(Number(c.allocated_paid))}</DataTd>
                       <DataTd className="font-medium">{formatCurrency(Number(c.outstanding))}</DataTd>
                       <DataTd><LedgerStatusBadge status={c.ledger_status} /></DataTd>
-                      {isOwner(user) ? (
+                      {canOwn(user) ? (
                         <DataTd>
                           <VoidChargeButton
                             chargeId={c.id}
@@ -175,7 +196,7 @@ export default async function PaymentsPage({
                   </div>
                   <p className="mt-2 text-sm">Outstanding {formatCurrency(Number(c.outstanding))}</p>
                   <p className="text-xs text-muted-foreground">Due {formatCurrency(Number(c.amount_due))} · Paid {formatCurrency(Number(c.allocated_paid))}</p>
-                  {isOwner(user) ? (
+                  {canOwn(user) ? (
                     <div className="mt-3">
                       <VoidChargeButton
                         chargeId={c.id}
@@ -189,6 +210,7 @@ export default async function PaymentsPage({
                 </div>
               ))}
             </div>
+            <ListPagination page={chargePage} pageSize={LIST_PAGE_SIZE} total={allCharges.length} hrefFor={chargesHref} />
           </>
         )}
       </section>
@@ -196,7 +218,7 @@ export default async function PaymentsPage({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Received</h2>
         <p className="text-xs text-muted-foreground">Transaction list by payment date. August collected above uses allocations to August charges.</p>
-        {payments.length === 0 ? (
+        {paymentResult.total === 0 ? (
           <EmptyState
             title="No payments recorded"
             description="Record a payment from a resident profile when rent is collected."
@@ -248,6 +270,7 @@ export default async function PaymentsPage({
                 </div>
               ))}
             </div>
+            <ListPagination page={receiptPage} pageSize={LIST_PAGE_SIZE} total={paymentResult.total} hrefFor={receiptsHref} />
           </>
         )}
       </section>

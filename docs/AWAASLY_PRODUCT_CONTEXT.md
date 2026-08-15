@@ -610,7 +610,7 @@ Email confirmation guidance
 
 /demo
 
-Secure one-click demo login
+Secure one-click demo login on **staging** (and local). Production Explore Demo uses `NEXT_PUBLIC_DEMO_URL` so visitors open the stable staging `/demo` instead of a dead production `/demo`. Staging Start Free uses `NEXT_PUBLIC_PRIMARY_APP_URL` so new owners sign up on production.
 
 /forgot-password
 
@@ -1250,11 +1250,11 @@ Awaasly helps PG and hostel operators manage properties, rooms, residents and co
 
 Primary CTA:
 
-Start Free
+Start Free (production `/signup`, or `NEXT_PUBLIC_PRIMARY_APP_URL/signup` from staging demo)
 
 Secondary CTA:
 
-Explore Demo
+Explore Demo (`/demo` on staging; production uses `NEXT_PUBLIC_DEMO_URL`)
 
 The landing page should stay calm and product-focused.
 

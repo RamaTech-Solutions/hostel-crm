@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteDocument } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/ui/confirm-action";
 import { toast } from "sonner";
 
 export function DeleteDocumentButton({
@@ -17,9 +18,6 @@ export function DeleteDocumentButton({
   const [loading, setLoading] = useState(false);
 
   async function onDelete() {
-    if (!window.confirm("Remove this document from the resident record? The file will no longer be available.")) {
-      return;
-    }
     setLoading(true);
     const form = new FormData();
     form.set("documentId", documentId);
@@ -34,8 +32,18 @@ export function DeleteDocumentButton({
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" disabled={loading} onClick={onDelete}>
-      {loading ? "Removing..." : "Delete"}
-    </Button>
+    <ConfirmAction
+      title="Delete this document?"
+      description="Remove this file from the resident record. It will no longer be available to view or download."
+      confirmLabel="Delete document"
+      destructive
+      pending={loading}
+      onConfirm={onDelete}
+      trigger={
+        <Button type="button" variant="outline" size="sm" disabled={loading}>
+          {loading ? "Removing..." : "Delete"}
+        </Button>
+      }
+    />
   );
 }

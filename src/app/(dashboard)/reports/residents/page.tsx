@@ -10,7 +10,7 @@ export default async function ResidentsReportPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const residents = await getResidents(user, { status: "staying" });
+  const { rows: residents } = await getResidents(user, { status: "staying" });
 
   return (
     <div>

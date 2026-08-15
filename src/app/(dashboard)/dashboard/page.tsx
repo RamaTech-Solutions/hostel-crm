@@ -262,7 +262,7 @@ function NeedsAttention({
   }
 
   return (
-    <Card>
+    <Card id="attention">
       <CardHeader>
         <CardTitle>Needs Attention</CardTitle>
       </CardHeader>
