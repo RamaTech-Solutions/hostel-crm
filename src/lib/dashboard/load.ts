@@ -10,6 +10,8 @@ export type DashboardLoadResult =
   | { ok: false; reason: "unauthorized_property" }
   | { ok: true; overview: DashboardOverview };
 
+const EMPTY_SCOPE = ["00000000-0000-0000-0000-000000000000"];
+
 export async function getDashboardOverview(user: AuthUser, propertyParam?: string | null): Promise<DashboardLoadResult> {
   const supabase = await createClient();
   const authorizedIds = await activePropertyIds(supabase, user);
@@ -21,9 +23,49 @@ export async function getDashboardOverview(user: AuthUser, propertyParam?: strin
   }
 
   const scopeIds = propertyParam ? [propertyParam] : authorizedIds;
+  const selectorFilter = authorizedIds.length ? authorizedIds : EMPTY_SCOPE;
+  const dataFilter = scopeIds.length ? scopeIds : EMPTY_SCOPE;
+  const periodStart = monthStart(new Date());
 
-  const propertiesQuery = supabase.from("properties").select("id, name, status").eq("status", "active").in("id", authorizedIds.length ? authorizedIds : ["00000000-0000-0000-0000-000000000000"]);
-  const { data: allAuthorizedProperties } = await propertiesQuery;
+  const [
+    { data: allAuthorizedProperties },
+    roomsCountResult,
+    occupancy,
+    { data: residents },
+    { data: charges },
+    { data: overdueRows },
+    { data: receipts },
+  ] = await Promise.all([
+    supabase.from("properties").select("id, name, status").eq("status", "active").in("id", selectorFilter),
+    scopeIds.length
+      ? supabase.from("rooms").select("id", { count: "exact", head: true }).in("property_id", scopeIds)
+      : Promise.resolve({ count: 0 as number | null }),
+    occupancyBedsForProperties(supabase, scopeIds),
+    supabase
+      .from("residents")
+      .select("id, status, monthly_rent, joining_date, planned_checkout_date, property_id, full_name, current_bed_assignment_id")
+      .in("property_id", dataFilter),
+    supabase
+      .from("rent_charge_balances")
+      .select("resident_id, outstanding")
+      .eq("period_start", periodStart)
+      .is("voided_at", null)
+      .in("property_id", dataFilter),
+    supabase
+      .from("rent_charge_balances")
+      .select("id, outstanding")
+      .eq("ledger_status", "overdue")
+      .is("voided_at", null)
+      .in("property_id", dataFilter),
+    supabase
+      .from("payments")
+      .select("id, amount, payment_method, payment_date, payment_type, resident:residents(full_name)")
+      .eq("payment_type", "rent")
+      .in("property_id", dataFilter)
+      .order("payment_date", { ascending: false })
+      .limit(5),
+  ]);
+
   const selectorProperties = (allAuthorizedProperties ?? [])
     .filter((p) => authorizedIds.includes(p.id))
     .map((p) => ({ id: p.id, name: p.name }));
@@ -33,67 +75,25 @@ export async function getDashboardOverview(user: AuthUser, propertyParam?: strin
     : selectorProperties;
 
   const propertyStatusById = Object.fromEntries((allAuthorizedProperties ?? []).map((p) => [p.id, p.status]));
-
-  const emptyScope = !scopeIds.length;
-  const ids = emptyScope ? [] : scopeIds;
-
-  const { count: totalRooms } = ids.length
-    ? await supabase.from("rooms").select("id", { count: "exact", head: true }).in("property_id", ids)
-    : { count: 0 };
-
-  const occupancy = await occupancyBedsForProperties(supabase, ids);
-
-  let residentsQuery = supabase
-    .from("residents")
-    .select("id, status, monthly_rent, joining_date, planned_checkout_date, property_id, full_name, current_bed_assignment_id");
-  if (ids.length) residentsQuery = residentsQuery.in("property_id", ids);
-  else residentsQuery = residentsQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
-  const { data: residents } = await residentsQuery;
-
-  const periodStart = monthStart(new Date());
-  let chargesQuery = supabase
-    .from("rent_charge_balances")
-    .select("resident_id, outstanding")
-    .eq("period_start", periodStart)
-    .is("voided_at", null);
-  if (ids.length) chargesQuery = chargesQuery.in("property_id", ids);
-  else chargesQuery = chargesQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
-  const { data: charges } = await chargesQuery;
-
-  let overdueQuery = supabase
-    .from("rent_charge_balances")
-    .select("id, outstanding")
-    .eq("ledger_status", "overdue")
-    .is("voided_at", null);
-  if (ids.length) overdueQuery = overdueQuery.in("property_id", ids);
-  else overdueQuery = overdueQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
-  const { data: overdueRows } = await overdueQuery;
-
   const stayingIds = (residents ?? []).map((r) => r.id);
-  const { data: documents } = stayingIds.length
-    ? await supabase.from("resident_documents").select("resident_id, document_type").in("resident_id", stayingIds)
-    : { data: [] as { resident_id: string; document_type: string }[] };
-  const { data: contacts } = stayingIds.length
-    ? await supabase.from("resident_contacts").select("resident_id, contact_type, name, phone").in("resident_id", stayingIds)
-    : { data: [] as { resident_id: string; contact_type: string; name: string | null; phone: string | null }[] };
-
-  let paymentsQuery = supabase
-    .from("payments")
-    .select("id, amount, payment_method, payment_date, payment_type, resident:residents(full_name)")
-    .eq("payment_type", "rent")
-    .order("payment_date", { ascending: false })
-    .limit(5);
-  if (ids.length) paymentsQuery = paymentsQuery.in("property_id", ids);
-  else paymentsQuery = paymentsQuery.in("property_id", ["00000000-0000-0000-0000-000000000000"]);
-  const { data: receipts } = await paymentsQuery;
-
   const assignmentIds = [...new Set((residents ?? []).map((r) => r.current_bed_assignment_id).filter(Boolean))] as string[];
-  const { data: assignments } = assignmentIds.length
-    ? await supabase
-        .from("bed_assignments")
-        .select("id, room:rooms(room_number), bed:beds(bed_label)")
-        .in("id", assignmentIds)
-    : { data: [] as Array<{ id: string; room?: { room_number: string } | null; bed?: { bed_label: string } | null }> };
+
+  const [{ data: documents }, { data: contacts }, { data: assignments }] = await Promise.all([
+    stayingIds.length
+      ? supabase.from("resident_documents").select("resident_id, document_type").in("resident_id", stayingIds)
+      : Promise.resolve({ data: [] as { resident_id: string; document_type: string }[] }),
+    stayingIds.length
+      ? supabase.from("resident_contacts").select("resident_id, contact_type, name, phone").in("resident_id", stayingIds)
+      : Promise.resolve({ data: [] as { resident_id: string; contact_type: string; name: string | null; phone: string | null }[] }),
+    assignmentIds.length
+      ? supabase
+          .from("bed_assignments")
+          .select("id, room:rooms(room_number), bed:beds(bed_label)")
+          .in("id", assignmentIds)
+      : Promise.resolve({
+          data: [] as Array<{ id: string; room?: { room_number: string } | null; bed?: { bed_label: string } | null }>,
+        }),
+  ]);
 
   const stayByAssignment = Object.fromEntries(
     (assignments ?? []).map((row) => {
@@ -119,7 +119,7 @@ export async function getDashboardOverview(user: AuthUser, propertyParam?: strin
     selectedPropertyId: propertyParam ?? null,
     selectorProperties,
     properties: scopedProperties,
-    totalRooms: totalRooms ?? 0,
+    totalRooms: roomsCountResult.count ?? 0,
     occupancyBeds: occupancy.beds,
     residents: (residents ?? []).map((r) => ({
       ...r,

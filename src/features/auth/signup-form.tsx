@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordField } from "@/features/auth/password-field";
 import { PasswordChecklist } from "@/features/auth/password-checklist";
+import { IndianMobileInput } from "@/components/india/indian-mobile-input";
 
 export function SignupForm() {
   const router = useRouter();
@@ -140,10 +141,7 @@ export function SignupForm() {
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" required autoComplete="email" />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="phone">Mobile Number</Label>
-          <Input id="phone" name="phone" inputMode="numeric" required pattern="\d{10}" placeholder="10-digit mobile" />
-        </div>
+        <IndianMobileInput id="phone" name="phone" label="Mobile Number" required />
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
           <PasswordField id="password" name="password" autoComplete="new-password" value={password} onChange={setPassword} />

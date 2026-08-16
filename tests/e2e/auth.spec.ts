@@ -27,7 +27,7 @@ test.describe("Awaasly", () => {
   test("signup page uses Awaasly branding", async ({ page }) => {
     await page.goto("/signup");
     await expect(page.getByRole("heading", { name: /Awaasly/i })).toBeVisible();
-    await expect(page.getByLabel("Full Name")).toBeVisible();
+    await expect(page.getByLabel(/Mobile Number/i)).toBeVisible();
     await expect(page.getByLabel("Business / PG Name")).toBeVisible();
     await expect(page.getByText("Password requirements")).toBeVisible();
   });

@@ -35,20 +35,21 @@ export default async function PaymentsPage({
   const next = shiftMonth(periodStart, 1);
   const chargePage = parsePage(params.page);
   const receiptPage = parsePage(params.rpage);
-  const [paymentResult, allCharges, summary, properties] = await Promise.all([
+  const [paymentResult, chargeResult, summary, properties] = await Promise.all([
     getPayments(user, { propertyId: params.property, page: receiptPage, pageSize: LIST_PAGE_SIZE }),
     getRentCharges(user, {
       periodStart,
       propertyId: params.property,
       status: params.status,
       search: params.q,
+      page: chargePage,
+      pageSize: LIST_PAGE_SIZE,
     }),
     getPeriodLedgerSummary(user, periodStart, params.property),
     getProperties(user),
   ]);
   const payments = paymentResult.rows;
-  const chargeFrom = (chargePage - 1) * LIST_PAGE_SIZE;
-  const charges = allCharges.slice(chargeFrom, chargeFrom + LIST_PAGE_SIZE);
+  const charges = chargeResult.rows;
 
   const query = new URLSearchParams();
   if (params.property) query.set("property", params.property);
@@ -141,7 +142,7 @@ export default async function PaymentsPage({
             description="Generate this month’s rent to start tracking collections. Existing receipts stay in payment history and are not auto-allocated."
             action={canWrite(user) && isCurrentBillingMonth(periodStart) ? <GenerateRentButton periodStart={periodStart} /> : undefined}
           />
-        ) : allCharges.length === 0 ? (
+        ) : chargeResult.total === 0 ? (
           <p className="text-sm text-muted-foreground">No charges match these filters.</p>
         ) : (
           <>
@@ -210,7 +211,7 @@ export default async function PaymentsPage({
                 </div>
               ))}
             </div>
-            <ListPagination page={chargePage} pageSize={LIST_PAGE_SIZE} total={allCharges.length} hrefFor={chargesHref} />
+            <ListPagination page={chargePage} pageSize={LIST_PAGE_SIZE} total={chargeResult.total} hrefFor={chargesHref} />
           </>
         )}
       </section>
