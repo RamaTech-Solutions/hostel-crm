@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { LIST_PAGE_SIZE, pageRange } from "@/lib/list-query";
 import { sanitizeSearchTerm } from "@/lib/search";
+import { periodChargeTotals } from "@/lib/finance/ledger-summary";
 import type {
   AuthUser,
   DashboardStats,
@@ -55,25 +56,31 @@ export type RoomWithBeds = Omit<Room, "beds"> & {
 
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { summarizeOccupancy } from "@/lib/inventory/occupancy";
+import { mapRoomsWithActiveAssignments } from "@/lib/inventory/rooms-with-beds";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
+async function activeAssignmentBedIds(supabase: ServerSupabase, propertyIds: string[]) {
+  if (!propertyIds.length) return new Set<string>();
+  const { data: assignments } = await supabase
+    .from("bed_assignments")
+    .select("bed_id")
+    .in("property_id", propertyIds)
+    .eq("is_active", true)
+    .is("end_date", null);
+  return new Set((assignments ?? []).map((row) => row.bed_id));
+}
 
 export async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
   if (!propertyIds.length) {
     return { beds: [] as { id: string; property_id: string; status: string; hasActiveAssignment: boolean }[], summary: summarizeOccupancy([]) };
   }
 
-  const [{ data: beds }, { data: assignments }] = await Promise.all([
+  const [{ data: beds }, active] = await Promise.all([
     supabase.from("beds").select("id, status, property_id").in("property_id", propertyIds),
-    supabase
-      .from("bed_assignments")
-      .select("bed_id")
-      .in("property_id", propertyIds)
-      .eq("is_active", true)
-      .is("end_date", null),
+    activeAssignmentBedIds(supabase, propertyIds),
   ]);
 
-  const active = new Set((assignments ?? []).map((row) => row.bed_id));
   const occupancyBeds = (beds ?? []).map((bed) => ({
     id: bed.id,
     property_id: bed.property_id,
@@ -193,23 +200,20 @@ export async function getDashboardStats(user: AuthUser): Promise<DashboardStats>
 export async function getPropertyStats(propertyId: string): Promise<PropertyStats> {
   const supabase = await createClient();
 
-  const { count: totalRooms } = await supabase
-    .from("rooms")
-    .select("id", { count: "exact" })
-    .eq("property_id", propertyId);
-
-  const occupancy = await occupancyBedsForProperties(supabase, [propertyId]);
+  const rentMonth = format(new Date(), "yyyy-MM-01");
+  const [{ count: totalRooms }, occupancy, { data: charges }] = await Promise.all([
+    supabase.from("rooms").select("id", { count: "exact", head: true }).eq("property_id", propertyId),
+    occupancyBedsForProperties(supabase, [propertyId]),
+    supabase
+      .from("rent_charge_balances")
+      .select("amount_due, allocated_paid, outstanding, voided_at")
+      .eq("property_id", propertyId)
+      .eq("period_start", rentMonth)
+      .is("voided_at", null),
+  ]);
   const totalBeds = occupancy.summary.total;
   const occupiedBeds = occupancy.summary.occupied;
   const availableBeds = occupancy.summary.vacant;
-
-  const rentMonth = format(new Date(), "yyyy-MM-01");
-  const { data: charges } = await supabase
-    .from("rent_charge_balances")
-    .select("amount_due, allocated_paid, outstanding, voided_at")
-    .eq("property_id", propertyId)
-    .eq("period_start", rentMonth)
-    .is("voided_at", null);
   const ledgerGenerated = (charges?.length ?? 0) > 0;
   const monthlyExpectedRevenue = ledgerGenerated
     ? charges?.reduce((s, c) => s + Number(c.amount_due), 0) ?? 0
@@ -331,30 +335,23 @@ export async function getRoomsWithBeds(propertyId: string): Promise<RoomWithBeds
   const supabase = await createClient();
   const { data: rooms } = await supabase
     .from("rooms")
-    .select("*, floor:floors(*), beds(*)")
+    .select("id, property_id, organization_id, floor_id, room_number, room_type, bed_capacity, monthly_rent, gender_restriction, notes, is_active, created_at, updated_at, floor:floors(*), beds(*)")
     .eq("property_id", propertyId)
     .order("room_number");
 
-  if (!rooms) return [];
+  if (!rooms?.length) return [];
 
-  const enriched = await Promise.all(
-    (rooms as Room[]).map(async (room) => {
-      const bedsWithResidents = await Promise.all(
-        ((room.beds ?? []) as Bed[]).map(async (bed) => {
-          const { data: assignment } = await supabase
-            .from("bed_assignments")
-            .select("*, resident:residents(id, full_name, mobile, status)")
-            .eq("bed_id", bed.id)
-            .eq("is_active", true)
-            .is("end_date", null)
-            .maybeSingle();
-          return { ...bed, assignment };
-        })
-      );
-      return { ...room, beds: bedsWithResidents };
-    })
-  );
-  return enriched as RoomWithBeds[];
+  const bedIds = rooms.flatMap((room) => ((room.beds ?? []) as Bed[]).map((bed) => bed.id));
+  const { data: assignments } = bedIds.length
+    ? await supabase
+        .from("bed_assignments")
+        .select("bed_id, resident:residents(id, full_name, mobile, status)")
+        .in("bed_id", bedIds)
+        .eq("is_active", true)
+        .is("end_date", null)
+    : { data: [] };
+
+  return mapRoomsWithActiveAssignments((rooms ?? []) as unknown as Room[], assignments ?? []) as RoomWithBeds[];
 }
 
 export async function getResidents(
@@ -539,15 +536,15 @@ export async function getAllBeds(user: AuthUser, propertyId?: string): Promise<B
   const scoped = propertyId && ids.includes(propertyId) ? [propertyId] : ids;
   if (!scoped.length) return [];
 
-  const { data } = await supabase
-    .from("beds")
-    .select("*, room:rooms(room_number), property:properties(id, name, status)")
-    .in("property_id", scoped)
-    .order("status");
-
-  const { beds: occupancyBeds } = await occupancyBedsForProperties(supabase, scoped);
-  const active = new Set(occupancyBeds.filter((bed) => bed.hasActiveAssignment).map((bed) => bed.id));
-  return ((data ?? []) as BedWithRelations[]).map((bed) => ({
+  const [{ data }, active] = await Promise.all([
+    supabase
+      .from("beds")
+      .select("id, property_id, organization_id, room_id, bed_label, status, monthly_rent, created_at, updated_at, room:rooms(room_number), property:properties(id, name, status)")
+      .in("property_id", scoped)
+      .order("status"),
+    activeAssignmentBedIds(supabase, scoped),
+  ]);
+  return ((data ?? []) as unknown as BedWithRelations[]).map((bed) => ({
     ...bed,
     hasActiveAssignment: active.has(bed.id),
   }));
@@ -578,45 +575,76 @@ export async function getPayments(
 
 export async function getRentCharges(
   user: AuthUser,
-  filters: { periodStart: string; propertyId?: string; status?: string; search?: string }
-): Promise<RentChargeBalance[]> {
+  filters: {
+    periodStart: string;
+    propertyId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }
+): Promise<{ rows: RentChargeBalance[]; total: number }> {
   const supabase = await createClient();
+  const paginate = typeof filters.page === "number";
+  const pageSize = filters.pageSize ?? LIST_PAGE_SIZE;
+  const search = sanitizeSearchTerm(filters.search);
+
   let query = supabase
     .from("rent_charge_balances")
-    .select("*, resident:residents(full_name, status), property:properties(name)")
+    .select("*, resident:residents(full_name, status), property:properties(name)", { count: "exact" })
     .eq("period_start", filters.periodStart)
     .is("voided_at", null)
     .order("due_date");
   if (user.role !== "owner") query = query.in("property_id", user.assignedPropertyIds);
   if (filters.propertyId) query = query.eq("property_id", filters.propertyId);
   if (filters.status && filters.status !== "all") query = query.eq("ledger_status", filters.status);
-  const { data } = await query;
-  let rows = (data ?? []) as RentChargeBalance[];
-  const search = sanitizeSearchTerm(filters.search);
+
   if (search) {
+    const { data } = await query;
     const q = search.toLowerCase();
-    rows = rows.filter((row) => (row.resident as { full_name?: string } | undefined)?.full_name?.toLowerCase().includes(q));
+    const matched = ((data ?? []) as RentChargeBalance[]).filter((row) =>
+      (row.resident as { full_name?: string } | undefined)?.full_name?.toLowerCase().includes(q)
+    );
+    if (!paginate) return { rows: matched, total: matched.length };
+    const { from, to } = pageRange(filters.page!, pageSize);
+    return { rows: matched.slice(from, to + 1), total: matched.length };
   }
-  return rows;
+
+  if (paginate) {
+    const { from, to } = pageRange(filters.page!, pageSize);
+    query = query.range(from, to);
+  }
+  const { data, count } = await query;
+  const rows = (data ?? []) as RentChargeBalance[];
+  return { rows, total: count ?? rows.length };
+}
+
+function applyChargeScope<T extends { in: (col: string, ids: string[]) => T; eq: (col: string, val: string) => T }>(
+  query: T,
+  user: AuthUser,
+  propertyId?: string
+) {
+  let next = query;
+  if (user.role !== "owner") next = next.in("property_id", user.assignedPropertyIds);
+  if (propertyId) next = next.eq("property_id", propertyId);
+  return next;
 }
 
 export async function getPeriodLedgerSummary(user: AuthUser, periodStart: string, propertyId?: string) {
-  const charges = await getRentCharges(user, { periodStart, propertyId });
-  const ledgerGenerated = charges.length > 0;
-  const due = charges.reduce((s, c) => s + Number(c.amount_due), 0);
-  const collected = charges.reduce((s, c) => s + Number(c.allocated_paid), 0);
-  const outstanding = charges.reduce((s, c) => s + Number(c.outstanding), 0);
-
   const supabase = await createClient();
+  let totalsQuery = supabase
+    .from("rent_charge_balances")
+    .select("amount_due, allocated_paid, outstanding")
+    .eq("period_start", periodStart)
+    .is("voided_at", null);
+  totalsQuery = applyChargeScope(totalsQuery, user, propertyId);
+
   let overdueQuery = supabase
     .from("rent_charge_balances")
     .select("outstanding")
     .eq("ledger_status", "overdue")
     .is("voided_at", null);
-  if (user.role !== "owner") overdueQuery = overdueQuery.in("property_id", user.assignedPropertyIds);
-  if (propertyId) overdueQuery = overdueQuery.eq("property_id", propertyId);
-  const { data: overdueRows } = await overdueQuery;
-  const overdue = (overdueRows ?? []).reduce((s, c) => s + Number(c.outstanding), 0);
+  overdueQuery = applyChargeScope(overdueQuery, user, propertyId);
 
   let legacyQuery = supabase
     .from("payments")
@@ -624,15 +652,19 @@ export async function getPeriodLedgerSummary(user: AuthUser, periodStart: string
     .eq("payment_type", "rent")
     .is("rent_charge_id", null)
     .eq("rent_month", periodStart);
-  if (user.role !== "owner") legacyQuery = legacyQuery.in("property_id", user.assignedPropertyIds);
-  if (propertyId) legacyQuery = legacyQuery.eq("property_id", propertyId);
-  const { count: legacyCount } = await legacyQuery;
+  legacyQuery = applyChargeScope(legacyQuery, user, propertyId);
+
+  const [{ data: charges }, { data: overdueRows }, { count: legacyCount }] = await Promise.all([
+    totalsQuery,
+    overdueQuery,
+    legacyQuery,
+  ]);
+
+  const totals = periodChargeTotals(charges ?? []);
+  const overdue = (overdueRows ?? []).reduce((s, c) => s + Number(c.outstanding), 0);
 
   return {
-    ledgerGenerated,
-    due: ledgerGenerated ? due : 0,
-    collected: ledgerGenerated ? collected : 0,
-    outstanding: ledgerGenerated ? outstanding : 0,
+    ...totals,
     overdue,
     legacyReceiptCount: legacyCount ?? 0,
   };

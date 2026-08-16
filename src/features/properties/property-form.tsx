@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { IndianMobileInput } from "@/components/india/indian-mobile-input";
+import { StateSelect } from "@/components/india/state-select";
 import type { Property } from "@/types/database";
 
 export function PropertyForm({ property }: { property?: Property }) {
@@ -58,9 +60,15 @@ export function PropertyForm({ property }: { property?: Property }) {
               <Label htmlFor="city">City *</Label>
               <Input id="city" name="city" required defaultValue={property?.city} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State *</Label>
-              <Input id="state" name="state" required defaultValue={property?.state ?? "Uttar Pradesh"} />
+            <div>
+              <StateSelect
+                id="state"
+                name="state"
+                required
+                currentStored={property?.state}
+                defaultValue={property ? (property.state ?? "") : "Uttar Pradesh"}
+                allowEmpty={Boolean(property) && !(property?.state ?? "").trim()}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -68,10 +76,13 @@ export function PropertyForm({ property }: { property?: Property }) {
               <Label htmlFor="pincode">Pincode *</Label>
               <Input id="pincode" name="pincode" required pattern="\d{6}" defaultValue={property?.pincode} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Contact Phone</Label>
-              <Input id="contact_phone" name="contact_phone" pattern="\d{10}" defaultValue={property?.contact_phone ?? ""} />
-            </div>
+            <IndianMobileInput
+              id="contact_phone"
+              name="contact_phone"
+              label="Contact Phone"
+              storedValue={property?.contact_phone}
+              defaultValue={property?.contact_phone ?? ""}
+            />
           </div>
           {!isEdit ? (
             <div className="space-y-2">

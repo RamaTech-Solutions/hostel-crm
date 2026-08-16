@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OnboardingProgress } from "@/components/ui/onboarding-progress";
+import { IndianMobileInput } from "@/components/india/indian-mobile-input";
+import { StateSelect } from "@/components/india/state-select";
 import type { Floor, Property } from "@/types/database";
 
 const STEPS = ["Welcome", "Property", "Floors", "Rooms", "Finish"] as const;
@@ -234,10 +236,7 @@ export function OnboardingWizard({
               <Label htmlFor="organization_name">Business / organization name</Label>
               <Input id="organization_name" name="organization_name" required defaultValue={orgName} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Mobile number</Label>
-              <Input id="phone" name="phone" defaultValue={phone} pattern="\d{10}" />
-            </div>
+            <IndianMobileInput id="phone" name="phone" label="Mobile number" required storedValue={phone} defaultValue={phone} />
             <Button type="submit" disabled={loading} className="w-full min-h-11">
               {loading ? "Saving..." : "Start Setup"}
             </Button>
@@ -272,19 +271,28 @@ export function OnboardingWizard({
                 <Label htmlFor="city">City</Label>
                 <Input id="city" name="city" required defaultValue={property?.city ?? ""} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input id="state" name="state" required defaultValue={property?.state || "Uttar Pradesh"} />
+              <div>
+                <StateSelect
+                  id="state"
+                  name="state"
+                  required
+                  currentStored={property?.state}
+                  defaultValue={property ? (property.state ?? "") : "Uttar Pradesh"}
+                  allowEmpty={Boolean(property) && !(property?.state ?? "").trim()}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="pincode">PIN code</Label>
               <Input id="pincode" name="pincode" required pattern="\d{6}" defaultValue={property?.pincode ?? ""} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Contact number (optional)</Label>
-              <Input id="contact_phone" name="contact_phone" inputMode="numeric" pattern="\d{10}" defaultValue={property?.contact_phone ?? ""} />
-            </div>
+            <IndianMobileInput
+              id="contact_phone"
+              name="contact_phone"
+              label="Contact number (optional)"
+              storedValue={property?.contact_phone}
+              defaultValue={property?.contact_phone ?? ""}
+            />
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button type="button" variant="outline" className="min-h-11 sm:flex-1" onClick={() => setStep("welcome")}>
                 Back

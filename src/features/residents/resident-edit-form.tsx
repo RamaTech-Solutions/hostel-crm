@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { IndianMobileInput } from "@/components/india/indian-mobile-input";
+import { StateSelect } from "@/components/india/state-select";
 import type { Resident, ResidentContact } from "@/types/database";
 
 export function ResidentEditForm({
@@ -51,7 +53,7 @@ export function ResidentEditForm({
         <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
           <p className="text-sm text-muted-foreground">Room and bed changes use Transfer. This form does not move the resident.</p>
           <div className="space-y-2"><Label>Full name</Label><Input name="full_name" required defaultValue={resident.full_name} /></div>
-          <div className="space-y-2"><Label>Mobile</Label><Input name="mobile" required defaultValue={resident.mobile} /></div>
+          <IndianMobileInput name="mobile" label="Mobile" required storedValue={resident.mobile} defaultValue={resident.mobile} />
           <div className="space-y-2"><Label>Email</Label><Input name="email" type="email" defaultValue={resident.email ?? ""} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2"><Label>Date of birth</Label><Input name="date_of_birth" type="date" defaultValue={resident.date_of_birth ?? ""} /></div>
@@ -70,16 +72,21 @@ export function ResidentEditForm({
           <div className="space-y-2"><Label>Address</Label><Input name="address_line" defaultValue={address?.address_line ?? ""} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2"><Label>City</Label><Input name="city" defaultValue={address?.city ?? ""} /></div>
-            <div className="space-y-2"><Label>State</Label><Input name="state" defaultValue={address?.state ?? ""} /></div>
+            <StateSelect
+              name="state"
+              currentStored={address?.state}
+              defaultValue={address?.state ?? ""}
+              allowEmpty
+            />
           </div>
           <div className="space-y-2"><Label>Pincode</Label><Input name="pincode" defaultValue={address?.pincode ?? ""} /></div>
           <div className="space-y-2"><Label>Guardian name</Label><Input name="guardian_name" defaultValue={guardian?.name ?? ""} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2"><Label>Relation</Label><Input name="guardian_relation" defaultValue={guardian?.relation ?? ""} /></div>
-            <div className="space-y-2"><Label>Guardian phone</Label><Input name="guardian_phone" defaultValue={guardian?.phone ?? ""} /></div>
+            <IndianMobileInput name="guardian_phone" label="Guardian phone" storedValue={guardian?.phone} defaultValue={guardian?.phone ?? ""} />
           </div>
           <div className="space-y-2"><Label>Emergency name</Label><Input name="emergency_name" defaultValue={emergency?.name ?? ""} /></div>
-          <div className="space-y-2"><Label>Emergency phone</Label><Input name="emergency_phone" defaultValue={emergency?.phone ?? ""} /></div>
+          <IndianMobileInput name="emergency_phone" label="Emergency phone" storedValue={emergency?.phone} defaultValue={emergency?.phone ?? ""} />
           <div className="space-y-2"><Label>Company / college</Label><Input name="company_college" defaultValue={resident.company_college ?? ""} /></div>
           <div className="space-y-2"><Label>Employee / student ID</Label><Input name="employee_student_id" defaultValue={resident.employee_student_id ?? ""} /></div>
           <div className="space-y-2"><Label>Work address</Label><Textarea name="work_address" defaultValue={resident.work_address ?? ""} /></div>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/auth/password-policy";
+import { requiredIndianMobileSchema, requiredIndianStateSchema } from "@/lib/india/zod";
 
 const passwordField = z.string().superRefine((value, ctx) => {
   if (!validatePassword(value).valid) {
@@ -33,7 +34,7 @@ export const signupSchema = z
     email: z.string().email("Enter a valid email"),
     password: passwordField,
     confirm_password: z.string().min(1, "Confirm your password"),
-    phone: z.string().regex(/^\d{10}$/, "Enter a valid 10-digit mobile number"),
+    phone: requiredIndianMobileSchema,
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match.",
@@ -47,7 +48,7 @@ export const propertySchema = z.object({
   city: z.string().trim().min(2, "City is required").max(80),
   state: z.string().trim().min(2, "State is required").max(80),
   pincode: z.string().trim().regex(/^\d{6}$/, "Enter valid 6-digit pincode"),
-  contact_phone: z.string().regex(/^\d{10}$/, "Enter valid 10-digit mobile").optional().or(z.literal("")),
+  contact_phone: z.string().optional().or(z.literal("")),
   status: z.enum(["active", "inactive", "maintenance"]),
   floor_count: z.coerce.number().min(1).max(50),
   notes: z.string().optional(),
@@ -89,11 +90,11 @@ export const onboardingPersonalSchema = z.object({
 });
 
 export const onboardingContactSchema = z.object({
-  mobile: z.string().regex(/^\d{10}$/, "Enter valid 10-digit mobile"),
+  mobile: requiredIndianMobileSchema,
   email: z.string().email().optional().or(z.literal("")),
   guardian_name: z.string().min(2, "Guardian name is required"),
   guardian_relation: z.string().min(2, "Relation is required"),
-  guardian_phone: z.string().regex(/^\d{10}$/, "Enter valid 10-digit mobile"),
+  guardian_phone: requiredIndianMobileSchema,
   emergency_name: z.string().optional(),
   emergency_phone: z.string().optional(),
 });
@@ -101,7 +102,7 @@ export const onboardingContactSchema = z.object({
 export const onboardingAddressSchema = z.object({
   address_line: z.string().min(5, "Address is required"),
   city: z.string().min(2, "City is required"),
-  state: z.string().min(2, "State is required"),
+  state: requiredIndianStateSchema,
   pincode: z.string().regex(/^\d{6}$/, "Enter valid pincode"),
 });
 
