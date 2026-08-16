@@ -17,6 +17,8 @@ import { getPublicSignupHref } from "@/lib/app-url";
 import { isDemoOrganization } from "@/lib/auth/tenant-redirect";
 import { identityForPersistence } from "@/lib/residents/identity";
 import { residentCreateSchema, residentProfileEditSchema } from "@/lib/residents/validation";
+import { resolveMobileForWrite } from "@/lib/india/phone";
+import { resolveStateForWrite } from "@/lib/india/states";
 import { mapLifecycleError, RESIDENT_ERRORS } from "@/lib/residents/errors";
 import { validateCheckoutDate, validateTransferDate } from "@/lib/residents/dates";
 import { decideFirstPropertyAction } from "@/lib/onboarding/first-property";
@@ -65,10 +67,20 @@ export async function createProperty(formData: FormData) {
 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
+  const state = resolveStateForWrite(parsed.data.state, undefined, true);
+  if (!state.ok) return { error: state.error };
+  const contactPhone = resolveMobileForWrite(parsed.data.contact_phone ?? "", undefined, false);
+  if (!contactPhone.ok) return { error: contactPhone.error };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("properties")
-    .insert({ ...parsed.data, organization_id: user.organization.id })
+    .insert({
+      ...parsed.data,
+      state: state.value,
+      contact_phone: contactPhone.value,
+      organization_id: user.organization.id,
+    })
     .select()
     .single();
 
@@ -92,6 +104,14 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     return { error: "Unauthorized" };
   }
 
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("properties")
+    .select("id, state, contact_phone")
+    .eq("id", propertyId)
+    .maybeSingle();
+  if (!existing) return { error: "Unauthorized" };
+
   const parsed = propertySchema.safeParse({
     name: formData.get("name"),
     internal_code: formData.get("internal_code") || undefined,
@@ -108,7 +128,11 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
-  const supabase = await createClient();
+  const state = resolveStateForWrite(parsed.data.state, existing.state, true);
+  if (!state.ok) return { error: state.error };
+  const contactPhone = resolveMobileForWrite(parsed.data.contact_phone ?? "", existing.contact_phone, false);
+  if (!contactPhone.ok) return { error: contactPhone.error };
+
   const { error } = await supabase
     .from("properties")
     .update({
@@ -116,9 +140,9 @@ export async function updateProperty(propertyId: string, formData: FormData) {
       internal_code: parsed.data.internal_code,
       address_line: parsed.data.address_line,
       city: parsed.data.city,
-      state: parsed.data.state,
+      state: state.value,
       pincode: parsed.data.pincode,
-      contact_phone: parsed.data.contact_phone,
+      contact_phone: contactPhone.value,
       floor_count: parsed.data.floor_count,
       notes: parsed.data.notes,
       manager_id: parsed.data.manager_id,
@@ -530,6 +554,27 @@ export async function updateResident(residentId: string, formData: FormData) {
   const user = await requireAuthUser();
   if (!canWrite(user)) return { error: RESIDENT_ERRORS.unauthorized };
 
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("residents")
+    .select("id, property_id, id_number_masked, id_last_four, mobile, permanent_address")
+    .eq("id", residentId)
+    .maybeSingle();
+  if (!existing || (existing.property_id && !canAccessProperty(user, existing.property_id))) {
+    return { error: RESIDENT_ERRORS.unauthorized };
+  }
+
+  const { data: existingContacts } = await supabase
+    .from("resident_contacts")
+    .select("contact_type, phone")
+    .eq("resident_id", residentId);
+
+  const storedAddress = existing.permanent_address as { state?: string } | null;
+  const storedGuardianPhone =
+    existingContacts?.find((contact) => contact.contact_type === "guardian")?.phone ?? null;
+  const storedEmergencyPhone =
+    existingContacts?.find((contact) => contact.contact_type === "emergency")?.phone ?? null;
+
   const parsed = residentProfileEditSchema.safeParse({
     full_name: formData.get("full_name"),
     mobile: formData.get("mobile"),
@@ -557,11 +602,14 @@ export async function updateResident(residentId: string, formData: FormData) {
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
-  const supabase = await createClient();
-  const { data: existing } = await supabase.from("residents").select("id, property_id, id_number_masked, id_last_four").eq("id", residentId).maybeSingle();
-  if (!existing || (existing.property_id && !canAccessProperty(user, existing.property_id))) {
-    return { error: RESIDENT_ERRORS.unauthorized };
-  }
+  const mobile = resolveMobileForWrite(parsed.data.mobile, existing.mobile, true);
+  if (!mobile.ok) return { error: mobile.error };
+  const state = resolveStateForWrite(parsed.data.state, storedAddress?.state ?? "", false);
+  if (!state.ok) return { error: state.error };
+  const guardianPhone = resolveMobileForWrite(parsed.data.guardian_phone, storedGuardianPhone, false);
+  if (!guardianPhone.ok) return { error: guardianPhone.error };
+  const emergencyPhone = resolveMobileForWrite(parsed.data.emergency_phone, storedEmergencyPhone, false);
+  if (!emergencyPhone.ok) return { error: emergencyPhone.error };
 
   const identity = parsed.data.id_number
     ? identityForPersistence(parsed.data.id_number)
@@ -571,14 +619,14 @@ export async function updateResident(residentId: string, formData: FormData) {
     .from("residents")
     .update({
       full_name: parsed.data.full_name,
-      mobile: parsed.data.mobile,
+      mobile: mobile.value ?? parsed.data.mobile,
       email: parsed.data.email || null,
       gender: parsed.data.gender || null,
       date_of_birth: parsed.data.date_of_birth || null,
       permanent_address: {
         address_line: parsed.data.address_line || "",
         city: parsed.data.city || "",
-        state: parsed.data.state || "",
+        state: state.value,
         pincode: parsed.data.pincode || "",
       },
       id_type: parsed.data.id_type || null,
@@ -596,11 +644,11 @@ export async function updateResident(residentId: string, formData: FormData) {
   if (error) return { error: toUserError(error.message) };
 
   const contacts = [
-    parsed.data.guardian_name && parsed.data.guardian_phone
-      ? { type: "guardian", name: parsed.data.guardian_name, relation: parsed.data.guardian_relation, phone: parsed.data.guardian_phone }
+    parsed.data.guardian_name && guardianPhone.value
+      ? { type: "guardian", name: parsed.data.guardian_name, relation: parsed.data.guardian_relation, phone: guardianPhone.value }
       : null,
-    parsed.data.emergency_name && parsed.data.emergency_phone
-      ? { type: "emergency", name: parsed.data.emergency_name, relation: null, phone: parsed.data.emergency_phone }
+    parsed.data.emergency_name && emergencyPhone.value
+      ? { type: "emergency", name: parsed.data.emergency_name, relation: null, phone: emergencyPhone.value }
       : null,
   ].filter(Boolean) as { type: string; name: string; relation: string | null; phone: string }[];
 
@@ -859,7 +907,9 @@ export async function bootstrapOrganization(input?: {
     String(meta.full_name ?? meta.fullName ?? "").trim() ||
     user.email?.split("@")[0] ||
     "Owner";
-  const phone = input?.phone?.trim() || String(meta.phone ?? "").trim() || null;
+  const phoneInput = input?.phone?.trim() || String(meta.phone ?? "").trim();
+  const phone = resolveMobileForWrite(phoneInput, undefined, true);
+  if (!phone.ok) return { error: phone.error };
 
   if (!organizationName) {
     return { error: "Organization name is required" };
@@ -868,7 +918,7 @@ export async function bootstrapOrganization(input?: {
   const { data, error } = await supabase.rpc("bootstrap_organization", {
     p_organization_name: organizationName,
     p_full_name: fullName,
-    p_phone: phone,
+    p_phone: phone.value,
   });
 
   if (error) return { error: toUserError(error.message) };
@@ -930,15 +980,18 @@ export async function updateOnboardingWorkspace(formData: FormData) {
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const organizationName = String(formData.get("organization_name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
 
   if (fullName.length < 2) return { error: "Full name is required" };
   if (organizationName.length < 2) return { error: "Business name is required" };
 
   const supabase = await createClient();
+  const { data: profile } = await supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle();
+  const phone = resolveMobileForWrite(String(formData.get("phone") ?? ""), profile?.phone ?? null, true);
+  if (!phone.ok) return { error: phone.error };
+
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({ full_name: fullName, phone: phone || null })
+    .update({ full_name: fullName, phone: phone.value })
     .eq("id", user.id);
   if (profileError) return { error: toUserError(profileError.message) };
 
@@ -1121,17 +1174,19 @@ export async function getOnboardingSummary(propertyId: string) {
   if (!canAccessProperty(user, propertyId)) return { error: "Unauthorized" };
 
   const supabase = await createClient();
-  const { data: property } = await supabase.from("properties").select("name").eq("id", propertyId).maybeSingle();
-  const { count: floorCount } = await supabase.from("floors").select("id", { count: "exact", head: true }).eq("property_id", propertyId);
-  const { count: roomCount } = await supabase.from("rooms").select("id", { count: "exact", head: true }).eq("property_id", propertyId);
-  const { count: bedCount } = await supabase.from("beds").select("id", { count: "exact", head: true }).eq("property_id", propertyId);
+  const [{ data: property }, floors, rooms, beds] = await Promise.all([
+    supabase.from("properties").select("name").eq("id", propertyId).maybeSingle(),
+    supabase.from("floors").select("id", { count: "exact", head: true }).eq("property_id", propertyId),
+    supabase.from("rooms").select("id", { count: "exact", head: true }).eq("property_id", propertyId),
+    supabase.from("beds").select("id", { count: "exact", head: true }).eq("property_id", propertyId),
+  ]);
 
   return {
     data: {
       propertyName: property?.name ?? "Your property",
-      floorCount: floorCount ?? 0,
-      roomCount: roomCount ?? 0,
-      bedCount: bedCount ?? 0,
+      floorCount: floors.count ?? 0,
+      roomCount: rooms.count ?? 0,
+      bedCount: beds.count ?? 0,
     },
   };
 }

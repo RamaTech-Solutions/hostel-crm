@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { IndianMobileInput } from "@/components/india/indian-mobile-input";
+import { StateSelect } from "@/components/india/state-select";
 import { CheckCircle2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Property } from "@/types/database";
@@ -178,7 +180,7 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
             <>
               <section className="space-y-3">
                 <div className="space-y-2"><Label>Full Name *</Label><Input value={form.full_name} onChange={(e) => updateField("full_name", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Mobile *</Label><Input value={form.mobile} onChange={(e) => updateField("mobile", e.target.value)} inputMode="numeric" /></div>
+                <IndianMobileInput id="mobile" name="mobile" label="Mobile" required value={form.mobile} onChange={(value) => updateField("mobile", value)} />
                 <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => updateField("email", e.target.value)} /></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={form.date_of_birth} onChange={(e) => updateField("date_of_birth", e.target.value)} /></div>
@@ -200,7 +202,12 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
                 <div className="space-y-2"><Label>Address</Label><Input value={form.address_line} onChange={(e) => updateField("address_line", e.target.value)} /></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2"><Label>City</Label><Input value={form.city} onChange={(e) => updateField("city", e.target.value)} /></div>
-                  <div className="space-y-2"><Label>State</Label><Input value={form.state} onChange={(e) => updateField("state", e.target.value)} /></div>
+                  <StateSelect
+                    name="state"
+                    value={form.state}
+                    onChange={(value) => updateField("state", value)}
+                    allowEmpty
+                  />
                 </div>
                 <div className="space-y-2"><Label>Pincode</Label><Input value={form.pincode} onChange={(e) => updateField("pincode", e.target.value)} /></div>
               </section>
@@ -209,13 +216,13 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
                 <div className="space-y-2"><Label>Name</Label><Input value={form.guardian_name} onChange={(e) => updateField("guardian_name", e.target.value)} /></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2"><Label>Relation</Label><Input value={form.guardian_relation} onChange={(e) => updateField("guardian_relation", e.target.value)} /></div>
-                  <div className="space-y-2"><Label>Phone</Label><Input value={form.guardian_phone} onChange={(e) => updateField("guardian_phone", e.target.value)} /></div>
+                  <IndianMobileInput name="guardian_phone" label="Phone" value={form.guardian_phone} onChange={(value) => updateField("guardian_phone", value)} />
                 </div>
               </section>
               <section className="space-y-3">
                 <h3 className="text-sm font-medium">Emergency contact (optional)</h3>
                 <div className="space-y-2"><Label>Name</Label><Input value={form.emergency_name} onChange={(e) => updateField("emergency_name", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Phone</Label><Input value={form.emergency_phone} onChange={(e) => updateField("emergency_phone", e.target.value)} /></div>
+                <IndianMobileInput name="emergency_phone" label="Phone" value={form.emergency_phone} onChange={(value) => updateField("emergency_phone", value)} />
               </section>
               <section className="space-y-3">
                 <h3 className="text-sm font-medium">Work / college (optional)</h3>
