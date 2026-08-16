@@ -9,9 +9,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { PropertySwitcher } from "@/features/properties/property-switcher";
-import { classifyBed, summarizeOccupancy } from "@/lib/inventory/occupancy";
+import { occupancyDisplay, summarizeOccupancy } from "@/lib/inventory/occupancy";
 import Link from "next/link";
-import type { BedStatus } from "@/types/database";
 
 export default async function RoomsPage({
   searchParams,
@@ -81,18 +80,23 @@ export default async function RoomsPage({
               </CardHeader>
               <CardContent className="space-y-2">
                 {group.beds.map((bed) => {
-                  const category = classifyBed({
+                  const display = occupancyDisplay({
                     status: bed.status,
                     hasActiveAssignment: Boolean(bed.hasActiveAssignment),
+                    hasNoticeOccupant: Boolean(bed.hasNoticeOccupant),
                   });
                   return (
                     <div key={bed.id} className="flex items-center justify-between rounded-md border p-2">
                       <span className="text-sm font-medium">Bed {bed.bed_label}</span>
-                      <span className="flex items-center gap-2">
-                        {bed.hasNoticeOccupant ? <Badge variant="warning">On notice</Badge> : null}
-                        <span className="text-xs text-muted-foreground capitalize">{category}</span>
-                        <BedStatusBadge status={bed.status as BedStatus} />
-                      </span>
+                      {display === "notice" ? (
+                        <Badge variant="warning">On notice</Badge>
+                      ) : display === "occupied" ? (
+                        <BedStatusBadge status="occupied" />
+                      ) : display === "unavailable" ? (
+                        <BedStatusBadge status={bed.status === "reserved" ? "reserved" : "maintenance"} />
+                      ) : (
+                        <BedStatusBadge status="available" />
+                      )}
                     </div>
                   );
                 })}

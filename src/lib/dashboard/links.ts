@@ -14,6 +14,10 @@ export function dashboardDestinations(propertyId: string | null, periodStart: st
     outstanding: `/payments?${payments.toString()}`,
     overdue: `/payments?${overdue.toString()}`,
     vacantBeds: propertyId ? `/rooms?propertyId=${propertyId}` : "/rooms",
+    noticePeriod: `/residents?${new URLSearchParams({
+      status: "notice_period",
+      ...(propertyId ? { property: propertyId } : {}),
+    }).toString()}`,
     payments: propertyId ? `/payments?property=${propertyId}&period=${periodStart}` : `/payments?period=${periodStart}`,
   };
 }

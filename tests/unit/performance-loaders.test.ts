@@ -59,6 +59,15 @@ describe("getRoomsWithBeds batching", () => {
 });
 
 describe("rooms occupancy reuse", () => {
+  it("does not embed residents when loading occupancy assignments", () => {
+    const file = src("../../src/lib/queries/index.ts");
+    const start = file.indexOf("async function occupancyForBedIds");
+    const next = file.indexOf("export async function occupancyBedsForProperties", start);
+    const fn = file.slice(start, next);
+    expect(fn).toContain('.select("bed_id, resident_id")');
+    expect(fn).toContain('.in("bed_id"');
+    expect(fn).not.toContain("resident:residents");
+  });
   it("classifies from already-loaded beds plus assignment ids", () => {
     const beds = [
       { id: "1", status: "available" },
@@ -82,7 +91,7 @@ describe("rooms occupancy reuse", () => {
     const next = file.indexOf("export async function getPayments", start);
     const fn = file.slice(start, next);
     expect(fn).not.toContain("occupancyBedsForProperties");
-    expect(fn).toContain("activeAssignmentOccupancy");
+    expect(fn).toContain("occupancyForBedIds");
   });
 });
 
