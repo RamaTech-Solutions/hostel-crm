@@ -50,6 +50,7 @@ export type DashboardOverview = {
   overdueCount: number;
   overdueAmount: number;
   upcomingCheckouts: DashboardCheckoutRow[];
+  noticePeriodCount: number;
   missingDocumentsCount: number;
   missingContactCount: number;
   propertyOverview: DashboardPropertyOverviewRow[];
@@ -119,6 +120,7 @@ export function assembleDashboardOverview(input: {
   const propertyName = (id: string | null) =>
     input.properties.find((p) => p.id === id)?.name ?? "—";
 
+  const noticePeriodCount = staying.filter((r) => r.status === "notice_period").length;
   const upcomingCheckouts = staying
     .filter((r) => isUpcomingPlannedCheckout(r.planned_checkout_date, today))
     .sort((a, b) => (a.planned_checkout_date ?? "").localeCompare(b.planned_checkout_date ?? ""))
@@ -172,6 +174,7 @@ export function assembleDashboardOverview(input: {
     overdueCount: input.overdue.count,
     overdueAmount: input.overdue.amount,
     upcomingCheckouts,
+    noticePeriodCount,
     missingDocumentsCount,
     missingContactCount,
     propertyOverview,

@@ -1,14 +1,36 @@
 export type OccupancyCategory = "occupied" | "vacant" | "unavailable";
+export type OccupancyDisplay = OccupancyCategory | "notice";
 
 export type OccupancyBed = {
   status: string;
   hasActiveAssignment: boolean;
+  hasNoticeOccupant?: boolean;
 };
 
 export function classifyBed(bed: OccupancyBed): OccupancyCategory {
   if (bed.hasActiveAssignment) return "occupied";
   if (bed.status === "maintenance" || bed.status === "reserved") return "unavailable";
   return "vacant";
+}
+
+export function occupancyDisplay(bed: OccupancyBed): OccupancyDisplay {
+  const category = classifyBed(bed);
+  if (category === "occupied" && bed.hasNoticeOccupant) return "notice";
+  return category;
+}
+
+export function mapActiveAssignmentOccupancy(
+  assignments: Array<{ bed_id: string; resident_id?: string | null }>,
+  noticeResidentIds: Iterable<string> = []
+) {
+  const notice = new Set(noticeResidentIds);
+  const active = new Set<string>();
+  const noticeBeds = new Set<string>();
+  for (const row of assignments) {
+    active.add(row.bed_id);
+    if (row.resident_id && notice.has(row.resident_id)) noticeBeds.add(row.bed_id);
+  }
+  return { active, noticeBeds };
 }
 
 export function summarizeOccupancy(beds: OccupancyBed[]) {

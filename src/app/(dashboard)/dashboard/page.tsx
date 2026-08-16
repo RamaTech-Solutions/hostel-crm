@@ -16,6 +16,7 @@ import {
   FileText,
   Contact,
   LogOut,
+  Bell,
 } from "lucide-react";
 import Link from "next/link";
 import { FirstRunChecklist } from "@/features/dashboard/first-run-checklist";
@@ -222,6 +223,15 @@ function NeedsAttention({
       title: "Overdue rent",
       detail: `${overview.overdueCount} charge${overview.overdueCount === 1 ? "" : "s"} · ${formatCurrency(overview.overdueAmount)} (all periods)`,
       icon: IndianRupee,
+    });
+  }
+  if (overview.noticePeriodCount > 0) {
+    items.push({
+      key: "notice",
+      href: dest.noticePeriod,
+      title: "On notice period",
+      detail: `${overview.noticePeriodCount} current resident${overview.noticePeriodCount === 1 ? "" : "s"}`,
+      icon: Bell,
     });
   }
   if (overview.upcomingCheckouts.length > 0) {

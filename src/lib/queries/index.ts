@@ -56,33 +56,42 @@ export type RoomWithBeds = Omit<Room, "beds"> & {
 };
 
 import { startOfMonth, endOfMonth, format } from "date-fns";
-import { summarizeOccupancy } from "@/lib/inventory/occupancy";
+import { mapActiveAssignmentOccupancy, summarizeOccupancy } from "@/lib/inventory/occupancy";
 import { mapRoomsWithActiveAssignments } from "@/lib/inventory/rooms-with-beds";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
-async function activeAssignmentOccupancy(supabase: ServerSupabase, propertyIds: string[]) {
-  if (!propertyIds.length) return { active: new Set<string>(), noticeBeds: new Set<string>() };
-  const { data: assignments } = await supabase
+async function occupancyForBedIds(supabase: ServerSupabase, bedIds: string[]) {
+  if (!bedIds.length) return { active: new Set<string>(), noticeBeds: new Set<string>() };
+
+  const { data: assignments, error } = await supabase
     .from("bed_assignments")
-    .select("bed_id, resident:residents(status)")
-    .in("property_id", propertyIds)
+    .select("bed_id, resident_id")
+    .in("bed_id", bedIds)
     .eq("is_active", true)
     .is("end_date", null);
-  const active = new Set<string>();
-  const noticeBeds = new Set<string>();
-  for (const row of assignments ?? []) {
-    active.add(row.bed_id);
-    const resident = row.resident as { status?: string } | { status?: string }[] | null;
-    const status = Array.isArray(resident) ? resident[0]?.status : resident?.status;
-    if (status === "notice_period") noticeBeds.add(row.bed_id);
+  if (error) {
+    console.error("occupancy assignments failed", error.message);
+    throw new Error("We couldn't load occupancy.");
   }
-  return { active, noticeBeds };
-}
 
-async function activeAssignmentBedIds(supabase: ServerSupabase, propertyIds: string[]) {
-  const { active } = await activeAssignmentOccupancy(supabase, propertyIds);
-  return active;
+  const rows = assignments ?? [];
+  const residentIds = [...new Set(rows.map((row) => row.resident_id).filter(Boolean))] as string[];
+  const noticeResidentIds = new Set<string>();
+  if (residentIds.length) {
+    const { data: noticeResidents, error: noticeError } = await supabase
+      .from("residents")
+      .select("id")
+      .in("id", residentIds)
+      .eq("status", "notice_period");
+    if (noticeError) {
+      console.error("occupancy notice lookup failed", noticeError.message);
+    } else {
+      for (const row of noticeResidents ?? []) noticeResidentIds.add(row.id);
+    }
+  }
+
+  return mapActiveAssignmentOccupancy(rows, noticeResidentIds);
 }
 
 export async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
@@ -90,16 +99,18 @@ export async function occupancyBedsForProperties(supabase: ServerSupabase, prope
     return { beds: [] as { id: string; property_id: string; status: string; hasActiveAssignment: boolean }[], summary: summarizeOccupancy([]) };
   }
 
-  const [{ data: beds }, active] = await Promise.all([
-    supabase.from("beds").select("id, status, property_id").in("property_id", propertyIds),
-    activeAssignmentBedIds(supabase, propertyIds),
-  ]);
+  const { data: beds, error } = await supabase.from("beds").select("id, status, property_id").in("property_id", propertyIds);
+  if (error) {
+    console.error("occupancy beds failed", error.message);
+    throw new Error("We couldn't load occupancy.");
+  }
+  const occupancy = await occupancyForBedIds(supabase, (beds ?? []).map((bed) => bed.id));
 
   const occupancyBeds = (beds ?? []).map((bed) => ({
     id: bed.id,
     property_id: bed.property_id,
     status: bed.status,
-    hasActiveAssignment: active.has(bed.id),
+    hasActiveAssignment: occupancy.active.has(bed.id),
   }));
   return { beds: occupancyBeds, summary: summarizeOccupancy(occupancyBeds) };
 }
@@ -557,12 +568,9 @@ export async function getAvailableBeds(propertyId: string) {
   const supabase = await createClient();
   const { data: property } = await supabase.from("properties").select("status").eq("id", propertyId).maybeSingle();
   if (property?.status !== "active") return [];
-  const [{ data: beds }, { data: assignments }] = await Promise.all([
-    supabase.from("beds").select("*, room:rooms(id, room_number, monthly_rent)").eq("property_id", propertyId),
-    supabase.from("bed_assignments").select("bed_id").eq("property_id", propertyId).eq("is_active", true).is("end_date", null),
-  ]);
-  const active = new Set((assignments ?? []).map((row) => row.bed_id));
-  return (beds ?? []).filter((bed) => !active.has(bed.id) && bed.status !== "maintenance" && bed.status !== "reserved");
+  const { data: beds } = await supabase.from("beds").select("*, room:rooms(id, room_number, monthly_rent)").eq("property_id", propertyId);
+  const occupancy = await occupancyForBedIds(supabase, (beds ?? []).map((bed) => bed.id));
+  return (beds ?? []).filter((bed) => !occupancy.active.has(bed.id) && bed.status !== "maintenance" && bed.status !== "reserved");
 }
 
 export async function globalSearch(user: AuthUser, query: string) {
@@ -598,14 +606,12 @@ export async function getAllBeds(user: AuthUser, propertyId?: string): Promise<B
   const scoped = propertyId && ids.includes(propertyId) ? [propertyId] : ids;
   if (!scoped.length) return [];
 
-  const [{ data }, occupancy] = await Promise.all([
-    supabase
-      .from("beds")
-      .select("id, property_id, organization_id, room_id, bed_label, status, monthly_rent, created_at, updated_at, room:rooms(room_number), property:properties(id, name, status)")
-      .in("property_id", scoped)
-      .order("status"),
-    activeAssignmentOccupancy(supabase, scoped),
-  ]);
+  const { data } = await supabase
+    .from("beds")
+    .select("id, property_id, organization_id, room_id, bed_label, status, monthly_rent, created_at, updated_at, room:rooms(room_number), property:properties(id, name, status)")
+    .in("property_id", scoped)
+    .order("status");
+  const occupancy = await occupancyForBedIds(supabase, (data ?? []).map((bed) => bed.id));
   return ((data ?? []) as unknown as BedWithRelations[]).map((bed) => ({
     ...bed,
     hasActiveAssignment: occupancy.active.has(bed.id),

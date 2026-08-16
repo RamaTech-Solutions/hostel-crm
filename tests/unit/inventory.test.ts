@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyBed, summarizeOccupancy } from "@/lib/inventory/occupancy";
+import { classifyBed, occupancyDisplay, mapActiveAssignmentOccupancy, summarizeOccupancy } from "@/lib/inventory/occupancy";
 import { evaluateOperationalRoomCreate } from "@/lib/inventory/room-create";
 import {
   DUPLICATE_ROOM_ERROR,
@@ -65,6 +65,34 @@ describe("occupancy classification", () => {
 
   it("returns 0 occupancy when operational capacity is 0", () => {
     expect(summarizeOccupancy([bed("maintenance", false)]).occupancyPercent).toBe(0);
+  });
+
+  it("maps occupancy from bed_id assignments even when bed status is stale", () => {
+    const mapped = mapActiveAssignmentOccupancy(
+      [
+        { bed_id: "101a", resident_id: "r1" },
+        { bed_id: "102a", resident_id: "r-notice" },
+      ],
+      ["r-notice"]
+    );
+    expect(mapped.active).toEqual(new Set(["101a", "102a"]));
+    expect(mapped.noticeBeds).toEqual(new Set(["102a"]));
+    expect(classifyBed({ status: "occupied", hasActiveAssignment: mapped.active.has("101a") })).toBe("occupied");
+    expect(classifyBed({ status: "available", hasActiveAssignment: mapped.active.has("102a") })).toBe("occupied");
+    expect(mapped.noticeBeds.has("102a")).toBe(true);
+    expect(mapped.noticeBeds.has("101a")).toBe(false);
+  });
+
+  it("shows On notice instead of vacant plus Occupied", () => {
+    expect(
+      occupancyDisplay({ status: "occupied", hasActiveAssignment: true, hasNoticeOccupant: true })
+    ).toBe("notice");
+    expect(
+      occupancyDisplay({ status: "occupied", hasActiveAssignment: true, hasNoticeOccupant: false })
+    ).toBe("occupied");
+    expect(
+      occupancyDisplay({ status: "occupied", hasActiveAssignment: false, hasNoticeOccupant: false })
+    ).toBe("vacant");
   });
 });
 

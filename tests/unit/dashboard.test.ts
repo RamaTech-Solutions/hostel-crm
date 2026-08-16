@@ -123,6 +123,10 @@ describe("dashboard destinations", () => {
     expect(dashboardDestinations(propA, "2026-08-01").vacantBeds).toBe(`/rooms?propertyId=${propA}`);
     expect(dashboardDestinations(null, "2026-08-01").residents).toBe("/residents?status=staying");
     expect(dashboardDestinations(null, "2026-08-01").vacantBeds).toBe("/rooms");
+    expect(dashboardDestinations(propA, "2026-08-01").noticePeriod).toBe(
+      `/residents?status=notice_period&property=${propA}`
+    );
+    expect(dashboardDestinations(null, "2026-08-01").noticePeriod).toBe("/residents?status=notice_period");
   });
 });
 
@@ -165,6 +169,79 @@ describe("assembleDashboardOverview scope", () => {
     expect(overview.occupancy.vacant).toBe(0);
     expect(overview.totalProperties).toBe(1);
     expect(overview.rent.kind).toBe("complete");
+  });
+
+  it("counts occupied beds from assignments and notice even when checkout is more than 7 days out", () => {
+    const beds = [
+      { id: "101a", property_id: propA, status: "occupied", hasActiveAssignment: true },
+      { id: "101b", property_id: propA, status: "occupied", hasActiveAssignment: true },
+      { id: "103a", property_id: propA, status: "occupied", hasActiveAssignment: true },
+      { id: "102a", property_id: propA, status: "occupied", hasActiveAssignment: true },
+      { id: "102b", property_id: propA, status: "available", hasActiveAssignment: false },
+      { id: "103b", property_id: propA, status: "available", hasActiveAssignment: false },
+    ];
+    const overview = assembleDashboardOverview({
+      selectedPropertyId: propA,
+      selectorProperties: [{ id: propA, name: "Subhash Colony 21" }],
+      properties: [{ id: propA, name: "Subhash Colony 21" }],
+      totalRooms: 3,
+      occupancyBeds: beds,
+      residents: [
+        {
+          id: "1",
+          status: "active",
+          monthly_rent: 2000,
+          joining_date: "2026-08-15",
+          planned_checkout_date: null,
+          property_id: propA,
+          full_name: "Amanullah Khan",
+        },
+        {
+          id: "2",
+          status: "active",
+          monthly_rent: 2000,
+          joining_date: "2026-08-15",
+          planned_checkout_date: null,
+          property_id: propA,
+          full_name: "Farzana Khatoon",
+        },
+        {
+          id: "3",
+          status: "active",
+          monthly_rent: 2000,
+          joining_date: "2026-08-15",
+          planned_checkout_date: null,
+          property_id: propA,
+          full_name: "Modabbera khan",
+        },
+        {
+          id: "4",
+          status: "notice_period",
+          monthly_rent: 2000,
+          joining_date: "2026-08-15",
+          planned_checkout_date: "2026-09-16",
+          property_id: propA,
+          full_name: "Murshid Khan",
+        },
+      ],
+      propertyStatusById: { [propA]: "active" },
+      periodStart: "2026-08-01",
+      currentCharges: [
+        { resident_id: "1", outstanding: 0 },
+        { resident_id: "2", outstanding: 0 },
+        { resident_id: "3", outstanding: 0 },
+        { resident_id: "4", outstanding: 0 },
+      ],
+      overdue: { count: 0, amount: 0 },
+      documentsByResident: {},
+      contactsByResident: {},
+      recentReceipts: [],
+      today: "2026-08-16",
+    });
+    expect(overview.stayingCount).toBe(4);
+    expect(overview.occupancy).toMatchObject({ occupied: 4, vacant: 2, unavailable: 0 });
+    expect(overview.noticePeriodCount).toBe(1);
+    expect(overview.upcomingCheckouts).toHaveLength(0);
   });
 
   it("treats unauthorized property mixing as a loader concern; assemble only uses provided scope", () => {

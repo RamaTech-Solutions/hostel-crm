@@ -14,10 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BedStatusBadge } from "@/components/ui/status-badge";
-import { classifyBed } from "@/lib/inventory/occupancy";
+import { Badge } from "@/components/ui/badge";
+import { occupancyDisplay } from "@/lib/inventory/occupancy";
 import { toast } from "sonner";
 import Link from "next/link";
-import type { BedStatus, Floor } from "@/types/database";
+import type { Floor } from "@/types/database";
 import type { RoomWithBeds } from "@/lib/queries";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 
@@ -214,22 +215,31 @@ export function InventoryPanel({
                 <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                   {(room.beds ?? []).map((bed) => {
                     const resident = bed.assignment?.resident;
-                    const category = classifyBed({
+                    const display = occupancyDisplay({
                       status: bed.status,
                       hasActiveAssignment: Boolean(bed.assignment),
+                      hasNoticeOccupant: resident?.status === "notice_period",
                     });
                     return (
                       <div
                         key={bed.id}
                         className={`rounded-lg border p-3 ${
-                          category === "occupied" ? "border-success/30 bg-success/10" :
-                          category === "vacant" ? "border-primary/30 bg-primary/10" :
+                          display === "occupied" || display === "notice" ? "border-success/30 bg-success/10" :
+                          display === "vacant" ? "border-primary/30 bg-primary/10" :
                           "border-border bg-muted"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium">Bed {bed.bed_label}</span>
-                          <BedStatusBadge status={bed.status as BedStatus} />
+                          {display === "notice" ? (
+                            <Badge variant="warning">On notice</Badge>
+                          ) : display === "occupied" ? (
+                            <BedStatusBadge status="occupied" />
+                          ) : display === "unavailable" ? (
+                            <BedStatusBadge status={bed.status === "reserved" ? "reserved" : "maintenance"} />
+                          ) : (
+                            <BedStatusBadge status="available" />
+                          )}
                         </div>
                         {resident ? (
                           <Link href={`/residents/${resident.id}`} className="text-sm font-medium underline-offset-4 hover:underline">
@@ -238,7 +248,7 @@ export function InventoryPanel({
                           </Link>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            {category === "unavailable" ? "Unavailable" : "Vacant"}
+                            {display === "unavailable" ? "Unavailable" : "Vacant"}
                           </p>
                         )}
                         {canWriteRooms && !bed.assignment ? (
@@ -248,9 +258,9 @@ export function InventoryPanel({
                             variant="ghost"
                             className="mt-2 h-7 px-2"
                             disabled={Boolean(busy)}
-                            onClick={() => toggleBed(bed.id, category === "unavailable" ? "available" : "maintenance")}
+                            onClick={() => toggleBed(bed.id, display === "unavailable" ? "available" : "maintenance")}
                           >
-                            {category === "unavailable" ? "Restore vacant" : "Mark unavailable"}
+                            {display === "unavailable" ? "Restore vacant" : "Mark unavailable"}
                           </Button>
                         ) : null}
                       </div>
