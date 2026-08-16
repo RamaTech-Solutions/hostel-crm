@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { tenantKindFromMembership, tenantRedirect } from "@/lib/auth/tenant-redirect";
 
-const AUTH_PATHS = ["/login", "/signup", "/forgot-password"];
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -27,7 +27,6 @@ function hasSupabaseAuthCookie(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { response, user, configured, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
-  const onResetPassword = pathname === "/reset-password" || pathname.startsWith("/reset-password/");
 
   if (!configured && pathname !== "/setup") {
     return NextResponse.redirect(new URL("/setup", request.url));
@@ -56,11 +55,10 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    let ready = false;
-    let forceOwnerOnboarding = false;
+    let kind: ReturnType<typeof tenantKindFromMembership> = "incomplete";
 
     if (!profile?.organization_id) {
-      forceOwnerOnboarding = true;
+      kind = "incomplete";
     } else {
       const [{ data: org }, { data: roleRecord }] = await Promise.all([
         supabase
@@ -75,22 +73,16 @@ export async function middleware(request: NextRequest) {
           .maybeSingle(),
       ]);
 
-      const role = roleRecord?.role ?? "viewer";
-      const staff = role === "property_admin" || role === "viewer";
-      const complete = Boolean(org?.is_demo || org?.onboarding_completed_at || org?.slug === "urbanstay-pg");
-      ready = staff || complete;
-      forceOwnerOnboarding = !staff && !complete;
+      kind = tenantKindFromMembership({
+        hasProfile: true,
+        role: roleRecord?.role,
+        org,
+      });
     }
 
-    const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
-    const onAuthForm = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-
-    if (forceOwnerOnboarding && !onOnboarding && !pathname.startsWith("/auth/callback") && !onResetPassword) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
-    }
-
-    if (ready && (onOnboarding || onAuthForm) && !onResetPassword) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    const next = tenantRedirect(pathname, kind);
+    if (next) {
+      return NextResponse.redirect(new URL(next, request.url));
     }
   }
 

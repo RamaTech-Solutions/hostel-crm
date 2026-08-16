@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { decideFirstPropertyAction } from "@/lib/onboarding/first-property";
-import { planBedReconcile } from "@/lib/onboarding/beds";
+import { planBedReconcile, attachAssignmentHistory } from "@/lib/onboarding/beds";
 import { generateFloorRows, nextFloorNumber } from "@/lib/onboarding/floors";
 import { nextOnboardingCompletedAt } from "@/lib/onboarding/completion";
 import { propertySchema } from "@/lib/validations/schemas";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 describe("first property identity", () => {
   it("creates when none exist", () => {
@@ -57,6 +59,46 @@ describe("floors", () => {
     const first = generateFloorRows("prop", "org", 3).map((row) => row.floor_number);
     expect(first).toEqual([0, 1, 2]);
     expect(nextFloorNumber(first)).toBe(3);
+  });
+});
+
+describe("bed history batching", () => {
+  it("counts every assignment row per bed, not only the latest", () => {
+    const beds = [
+      { id: "b1", bed_label: "A", status: "available" },
+      { id: "b2", bed_label: "B", status: "occupied" },
+    ];
+    const rows = [
+      { bed_id: "b1" },
+      { bed_id: "b1" },
+      { bed_id: "b2" },
+    ];
+    const withHistory = attachAssignmentHistory(beds, rows);
+    expect(withHistory[0].historyCount).toBe(2);
+    expect(withHistory[1].historyCount).toBe(1);
+  });
+
+  it("uses zero when a bed has no assignment rows", () => {
+    const withHistory = attachAssignmentHistory(
+      [{ id: "b1", bed_label: "A", status: "available" }],
+      []
+    );
+    expect(withHistory[0].historyCount).toBe(0);
+    const blocked = planBedReconcile(
+      attachAssignmentHistory(
+        [
+          { id: "1", bed_label: "A", status: "available" },
+          { id: "2", bed_label: "B", status: "available" },
+        ],
+        [{ bed_id: "1" }, { bed_id: "1" }]
+      ),
+      1
+    );
+    expect(blocked.ok).toBe(true);
+    if (blocked.ok) {
+      expect(blocked.toDeleteIds).toEqual(["2"]);
+      expect(blocked.toDeleteIds).not.toContain("1");
+    }
   });
 });
 
@@ -124,5 +166,18 @@ describe("onboarding completion", () => {
       "2026-01-01T00:00:00.000Z"
     );
     expect(nextOnboardingCompletedAt(null, "2026-02-01T00:00:00.000Z")).toBe("2026-02-01T00:00:00.000Z");
+  });
+});
+
+describe("saveOnboardingRoom source", () => {
+  it("batches assignment history and does not revalidate onboarding on the add path", () => {
+    const sql = readFileSync(resolve(__dirname, "../../src/lib/actions/index.ts"), "utf8");
+    const start = sql.indexOf("export async function saveOnboardingRoom");
+    const end = sql.indexOf("export async function uploadDocument");
+    const fn = sql.slice(start, end);
+    expect(fn).toContain("applyBedReconcile");
+    expect(fn).not.toContain("revalidatePath(\"/onboarding\")");
+    expect(sql).toContain(".in(");
+    expect(sql).toContain("attachAssignmentHistory");
   });
 });

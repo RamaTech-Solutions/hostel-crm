@@ -32,6 +32,8 @@ npx supabase db reset
 
 Never `npx supabase db reset --linked`.
 
+After trigger-grant changes, run `npm run smoke:auth-identity` (localhost only) before any `db push --linked`.
+
 Remote apply (after printing the project ref):
 
 ```bash

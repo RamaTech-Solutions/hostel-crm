@@ -14,13 +14,14 @@ import {
 } from "@/lib/validations/schemas";
 import { toUserError } from "@/lib/user-error";
 import { getPublicSignupHref } from "@/lib/app-url";
+import { isDemoOrganization } from "@/lib/auth/tenant-redirect";
 import { identityForPersistence } from "@/lib/residents/identity";
 import { residentCreateSchema, residentProfileEditSchema } from "@/lib/residents/validation";
 import { mapLifecycleError, RESIDENT_ERRORS } from "@/lib/residents/errors";
 import { validateCheckoutDate, validateTransferDate } from "@/lib/residents/dates";
 import { decideFirstPropertyAction } from "@/lib/onboarding/first-property";
 import { generateFloorRows, nextFloorNumber, defaultFloorLabel } from "@/lib/onboarding/floors";
-import { planBedReconcile } from "@/lib/onboarding/beds";
+import { planBedReconcile, attachAssignmentHistory } from "@/lib/onboarding/beds";
 import { nextOnboardingCompletedAt } from "@/lib/onboarding/completion";
 import {
   DOCUMENT_ERRORS,
@@ -135,15 +136,15 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 async function loadBedReconcileInputs(supabase: SupabaseClient, roomId: string) {
   const { data: beds } = await supabase.from("beds").select("id, bed_label, status").eq("room_id", roomId);
   const currentBeds = beds ?? [];
-  return Promise.all(
-    currentBeds.map(async (bed) => {
-      const { count } = await supabase
-        .from("bed_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("bed_id", bed.id);
-      return { ...bed, historyCount: count ?? 0 };
-    })
-  );
+  if (currentBeds.length === 0) return [];
+  const { data: assignments } = await supabase
+    .from("bed_assignments")
+    .select("bed_id")
+    .in(
+      "bed_id",
+      currentBeds.map((bed) => bed.id)
+    );
+  return attachAssignmentHistory(currentBeds, assignments ?? []);
 }
 
 async function applyBedReconcile(
@@ -871,7 +872,16 @@ export async function bootstrapOrganization(input?: {
   });
 
   if (error) return { error: toUserError(error.message) };
-  return { organizationId: data as string };
+  const organizationId = data as string;
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("is_demo, slug")
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (isDemoOrganization(org)) {
+    return { error: "This account could not be created. Please try again." };
+  }
+  return { organizationId };
 }
 
 export async function completeOnboarding() {
@@ -1186,40 +1196,16 @@ export async function saveOnboardingRoom(formData: FormData) {
     if (error) return { error: "We couldn't create these rooms. Your previous setup is still safe." };
   }
 
-  const { data: beds } = await supabase.from("beds").select("id, bed_label, status").eq("room_id", roomId);
-  const currentBeds = beds ?? [];
-  const historyCounts = await Promise.all(
-    currentBeds.map(async (bed) => {
-      const { count } = await supabase
-        .from("bed_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("bed_id", bed.id);
-      return { ...bed, historyCount: count ?? 0 };
-    })
-  );
+  if (!roomId) return { error: "We couldn't create these rooms. Your previous setup is still safe." };
 
-  const plan = planBedReconcile(historyCounts, parsed.data.bed_capacity);
-  if (!plan.ok) return { error: plan.error };
-
-  if (plan.toDeleteIds.length) {
-    const { error } = await supabase.from("beds").delete().in("id", plan.toDeleteIds);
-    if (error) return { error: "We couldn't update beds. Your previous setup is still safe." };
-  }
-
-  if (plan.toInsert.length) {
-    const rows = plan.toInsert.map((bed_label) => ({
-      room_id: roomId,
-      property_id: parsed.data.property_id,
-      organization_id: user.organization.id,
-      bed_label,
-      status: "available" as const,
-      monthly_rent: parsed.data.monthly_rent,
-    }));
-    const { error } = await supabase.from("beds").insert(rows);
-    if (error && error.code !== "23505") {
-      return { error: "We couldn't create these rooms. Your previous setup is still safe." };
-    }
-  }
+  const applied = await applyBedReconcile(supabase, {
+    roomId,
+    propertyId: parsed.data.property_id,
+    organizationId: user.organization.id,
+    desired: parsed.data.bed_capacity,
+    monthlyRent: parsed.data.monthly_rent,
+  });
+  if (applied && "error" in applied && applied.error) return { error: applied.error };
 
   const { data: rooms } = await supabase
     .from("rooms")
@@ -1227,7 +1213,6 @@ export async function saveOnboardingRoom(formData: FormData) {
     .eq("property_id", parsed.data.property_id)
     .order("room_number");
 
-  revalidatePath("/onboarding");
   return { data: rooms ?? [] };
 }
 

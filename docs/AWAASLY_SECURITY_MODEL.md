@@ -63,6 +63,24 @@ All use `SET search_path = ''` and `public.` / `auth.` qualification.
 
 `bootstrap_organization` cannot take a `user_id` argument.
 
+`public.update_updated_at_column` is `SECURITY INVOKER` with `SET search_path = ''`.
+
+`public.protect_demo_auth_identity` is trigger-only. `EXECUTE` is revoked from `PUBLIC`, `anon`, and `authenticated`. It is not a PostgREST RPC.
+
+### Accepted Advisor warnings
+
+Supabase Advisor `authenticated_security_definer_function_executable` is expected for these protected functions (do not revoke `authenticated` to silence the linter):
+
+**Business RPCs:** `bootstrap_organization`, `onboard_resident`, `transfer_resident`, `checkout_resident`, `generate_rent_charges`, `record_resident_payment`, `void_rent_charge`, `update_org_rent_due_day`.
+
+**RLS helpers:** `get_user_organization_id`, `get_user_role`, `get_user_property_ids`, `can_user_write`, `can_user_own`, `can_mutate_tenant`, `can_access_resident`, `storage_resident_id_from_object_name`.
+
+`storage_resident_id_from_object_name` stays DEFINER (parser plus org check via `get_user_organization_id`). Switching to INVOKER is deferred until Storage RLS is re-proven.
+
+### Deferred hardening
+
+Moving helpers from `public` to a non-exposed schema is a post-pilot change. It would touch many RLS policies.
+
 ## Service role
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only (seed / admin). It must never ship to the browser or Vercel `NEXT_PUBLIC_*` variables. Service role bypasses RLS — do not use it in user request paths.

@@ -85,3 +85,17 @@ describe("sprint 8 migration", () => {
     expect(sql).toContain("AND public.can_user_own()");
   });
 });
+
+describe("advisor security hygiene migration", () => {
+  it("pins updated_at search_path and revokes demo trigger RPC", () => {
+    const sql = readFileSync(
+      resolve(__dirname, "../../supabase/migrations/20260815210000_advisor_security_hygiene.sql"),
+      "utf8"
+    );
+    expect(sql).toContain("update_updated_at_column");
+    expect(sql).toContain("SET search_path = ''");
+    expect(sql).toContain("SECURITY INVOKER");
+    expect(sql).toContain("REVOKE ALL ON FUNCTION public.protect_demo_auth_identity()");
+    expect(sql).toContain("FROM PUBLIC, anon, authenticated");
+  });
+});
