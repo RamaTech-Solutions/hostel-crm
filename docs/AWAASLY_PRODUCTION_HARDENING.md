@@ -19,11 +19,23 @@ App:
 
 ## Demo auth identity (P0)
 
-`/demo` signs into the shared demo owner. A `BEFORE UPDATE` trigger on `auth.users` rejects email, password, phone, metadata, email/phone change, ban, and delete changes for users whose profile org is demo. Login timestamps may still update.
+`/demo` signs into the shared demo owner. A `BEFORE UPDATE` trigger on `auth.users` rejects email, password, phone, metadata, email/phone change, ban, and delete changes for users whose profile org is demo. Login timestamps may still update. The trigger function is not executable as a PostgREST RPC (`PUBLIC` / `anon` / `authenticated` revoked).
 
 Demo login rate limit is **best-effort in-memory per instance**, not Redis/CAPTCHA.
 
 Seed does not print demo passwords. `.env.example` lists `DEMO_OWNER_EMAIL` / `DEMO_OWNER_PASSWORD` names only.
+
+Local Auth regression after trigger-grant changes: `npm run smoke:auth-identity` against local Supabase only (never `*.supabase.co`). Do not `db push --linked` until that smoke passes.
+
+## Advisor (intentional vs fixed)
+
+Fixed in `20260815210000_advisor_security_hygiene.sql`: mutable `search_path` on `update_updated_at_column`; anon/authenticated execute on `protect_demo_auth_identity`.
+
+Remaining `authenticated` SECURITY DEFINER warnings on business RPCs and RLS helpers are **accepted**. See [AWAASLY_SECURITY_MODEL.md](./AWAASLY_SECURITY_MODEL.md). Advisor is not required to show zero warnings.
+
+## Pre-commercial-scale Auth checklist
+
+Enable Supabase **leaked-password protection** (HaveIBeenPwned) when Production Auth is on a plan that supports it. Keep the current application password policy until then. This is a Dashboard setting, not an app code change.
 
 ## Environment separation (Sprint 8.1)
 

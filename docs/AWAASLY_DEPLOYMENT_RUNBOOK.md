@@ -68,7 +68,7 @@ If the full `supabase/migrations/` chain fails, **stop**. Do not edit historical
 
 If local Supabase cannot run, do not initialize production; report rehearsal incomplete.
 
-**Rehearsal status (2026-08-15):** Docker Desktop available. `npx supabase start` then `npx supabase db reset` (not `--linked`) replayed the full checked-in chain through `20260815200000_demo_write_protection.sql`. CLI also ran `supabase/seed.sql` (comments only — not UrbanStay). Remote production is still uninitialized until you create the empty project.
+**Rehearsal status (2026-08-15):** Docker Desktop available. `npx supabase start` then `npx supabase db reset` (not `--linked`) replayed the full checked-in chain through `20260815200000_demo_write_protection.sql`. CLI also ran `supabase/seed.sql` (comments only — not UrbanStay). Remote production is still uninitialized until you create the empty project. Advisor hygiene is `20260815210000_advisor_security_hygiene.sql` (local reset + `npm run smoke:auth-identity` before any linked push).
 
 ## Production initialization
 
@@ -96,11 +96,14 @@ Set `PRODUCTION_SUPABASE_PROJECT_REF` in `.env.local` once production exists so 
 1. `npm test`
 2. `npm run lint`
 3. `npm run build`
-4. `npm run supabase:target` — confirm ref
-5. `npx supabase db push --linked --dry-run` then apply if correct
-6. Deploy Production (production env vars)
-7. Smoke: production signup; Explore Demo opens staging; staging Start Free opens production `/signup`
-8. No seeds on production
+4. `npm run smoke:auth-identity` against **local** Supabase (required after Auth trigger/grant changes)
+5. `npm run supabase:target` — confirm ref
+6. `npx supabase db push --linked --dry-run` then apply if correct
+7. Deploy Production (production env vars)
+8. Smoke: production signup; Explore Demo opens staging; staging Start Free opens production `/signup`
+9. No seeds on production
+
+Enable leaked-password protection on Production Auth when the plan supports it. See [AWAASLY_PRODUCTION_HARDENING.md](./AWAASLY_PRODUCTION_HARDENING.md).
 
 ## Dependency HIGH findings (do not force-upgrade)
 

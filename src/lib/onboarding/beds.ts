@@ -30,6 +30,23 @@ export type BedReconcilePlan =
   | { ok: true; toInsert: string[]; toDeleteIds: string[] }
   | { ok: false; error: string };
 
+/** Counts every assignment row per bed (historical + active), matching PostgREST count:exact. */
+export function historyCountsByBedId(rows: { bed_id: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.bed_id, (counts.get(row.bed_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function attachAssignmentHistory<T extends { id: string }>(
+  beds: T[],
+  assignmentRows: { bed_id: string }[]
+): Array<T & { historyCount: number }> {
+  const counts = historyCountsByBedId(assignmentRows);
+  return beds.map((bed) => ({ ...bed, historyCount: counts.get(bed.id) ?? 0 }));
+}
+
 export function planBedReconcile(beds: BedReconcileInput[], desired: number): BedReconcilePlan {
   if (!Number.isInteger(desired) || desired < 1 || desired > 20) {
     return { ok: false, error: "Enter a bed count between 1 and 20." };

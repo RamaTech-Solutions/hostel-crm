@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { signupSchema } from "@/lib/validations/schemas";
 import { toUserError } from "@/lib/user-error";
 import { authCallbackUrl } from "@/lib/app-url";
+import { destinationAfterSignUp, isDemoOrganization, shouldClearSessionBeforeSignUp } from "@/lib/auth/tenant-redirect";
 import { validatePassword } from "@/lib/auth/password-policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,27 @@ export function SignupForm() {
     }
 
     const supabase = createClient();
+    const {
+      data: { session: existingSession },
+    } = await supabase.auth.getSession();
+    if (existingSession?.user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", existingSession.user.id)
+        .maybeSingle();
+      if (profile?.organization_id) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("is_demo, slug")
+          .eq("id", profile.organization_id)
+          .maybeSingle();
+        if (shouldClearSessionBeforeSignUp(isDemoOrganization(org) ? "demo" : "ready")) {
+          await supabase.auth.signOut();
+        }
+      }
+    }
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
@@ -70,11 +92,33 @@ export function SignupForm() {
     }
 
     if (!data.session) {
+      setLoading(false);
       router.push(`/signup/check-email?email=${encodeURIComponent(parsed.data.email)}`);
       return;
     }
 
-    router.push("/onboarding");
+    if (data.user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      if (profile?.organization_id) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("is_demo, slug")
+          .eq("id", profile.organization_id)
+          .maybeSingle();
+        if (isDemoOrganization(org)) {
+          await supabase.auth.signOut();
+          setError("This account could not be created. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
+    router.push(destinationAfterSignUp(data.session));
     router.refresh();
   }
 

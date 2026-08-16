@@ -55,6 +55,7 @@ export function OnboardingWizard({
   const [step, setStep] = useState<OnboardingStep>(derived);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [roomAdding, setRoomAdding] = useState(false);
   const [property, setProperty] = useState(initialProperties[0] ?? null);
   const [floors, setFloors] = useState(initialFloors);
   const [rooms, setRooms] = useState(initialRooms);
@@ -152,18 +153,26 @@ export function OnboardingWizard({
 
   async function handleAddRoom(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (loading || !propertyId) return;
-    setLoading(true);
+    if (roomAdding || !propertyId) return;
+    setRoomAdding(true);
     setError(null);
     const form = new FormData(e.currentTarget);
     form.set("property_id", propertyId);
     const rent = String(form.get("monthly_rent") ?? "").trim();
     if (!rent) form.set("monthly_rent", "0");
-    const result = await saveOnboardingRoom(form);
-    if (result.error || !result.data) return fail(result.error ?? "We couldn't create these rooms. Your previous setup is still safe.");
-    setRooms(result.data as RoomRow[]);
-    (e.currentTarget as HTMLFormElement).reset();
-    setLoading(false);
+    try {
+      const result = await saveOnboardingRoom(form);
+      if (result.error || !result.data) {
+        fail(result.error ?? "We couldn't create these rooms. Your previous setup is still safe.");
+        return;
+      }
+      setRooms(result.data as RoomRow[]);
+      (e.currentTarget as HTMLFormElement).reset();
+    } catch {
+      fail("We couldn't create these rooms. Your previous setup is still safe.");
+    } finally {
+      setRoomAdding(false);
+    }
   }
 
   async function goToFinish(fromSkip = false) {
@@ -375,8 +384,8 @@ export function OnboardingWizard({
               </div>
               <input type="hidden" name="room_type" value="other" />
               <input type="hidden" name="gender_restriction" value="none" />
-              <Button type="submit" disabled={loading || !propertyId} className="min-h-11 w-full">
-                {loading ? "Saving..." : "Add"}
+              <Button type="submit" disabled={roomAdding || !propertyId} className="min-h-11 w-full">
+                {roomAdding ? "Saving..." : "Add"}
               </Button>
             </form>
             {rooms.length > 0 && (

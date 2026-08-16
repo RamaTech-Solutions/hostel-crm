@@ -39,6 +39,7 @@ Open [http://localhost:3000](http://localhost:3000) for the public landing page.
 | `npm run supabase:target` | Print configured Supabase host and project ref |
 | `npm test` | Unit tests |
 | `npm run smoke:rls` | Live tenant-isolation smoke |
+| `npm run smoke:auth-identity` | Local GoTrue demo/normal identity regression (localhost only) |
 | `npm run test:e2e` | Playwright |
 
 ## Roles
