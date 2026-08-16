@@ -15,3 +15,10 @@ export function validateCheckoutDate(assignmentStart: string, checkoutDate: stri
   }
   return null;
 }
+
+export function validateNoticeDate(assignmentStart: string, noticeDate: string) {
+  if (!isOnOrAfter(noticeDate, assignmentStart)) {
+    return "Notice date can't be before the current stay started.";
+  }
+  return null;
+}

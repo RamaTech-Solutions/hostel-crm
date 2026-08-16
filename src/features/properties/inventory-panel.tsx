@@ -234,6 +234,7 @@ export function InventoryPanel({
                         {resident ? (
                           <Link href={`/residents/${resident.id}`} className="text-sm font-medium underline-offset-4 hover:underline">
                             {resident.full_name}
+                            {resident.status === "notice_period" ? " · On notice" : ""}
                           </Link>
                         ) : (
                           <p className="text-sm text-muted-foreground">

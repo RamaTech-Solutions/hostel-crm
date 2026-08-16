@@ -9,6 +9,11 @@ export const RESIDENT_ERRORS = {
   bedUnavailable: "This bed is not available. Choose another bed.",
   transferDate: "Transfer date can't be before the current stay started.",
   checkoutDate: "Checkout date can't be before the current stay started.",
+  noticeDate: "Notice date can't be before the current stay started.",
+  noticeRequired: "Give notice before completing checkout.",
+  noticeFailed: "We couldn't update notice for this resident. Please try again.",
+  cancelNoticeFailed: "We couldn't cancel notice for this resident. Please try again.",
+  restoreFailed: "This stay can't be restored.",
   conflictRetry: "This request doesn't match the resident already saved. Refresh and try again.",
 } as const;
 
@@ -29,6 +34,8 @@ export function mapLifecycleError(message: string | undefined | null, fallback: 
   }
   if (raw.includes("transfer date")) return RESIDENT_ERRORS.transferDate;
   if (raw.includes("checkout date")) return RESIDENT_ERRORS.checkoutDate;
+  if (raw.includes("notice date")) return RESIDENT_ERRORS.noticeDate;
+  if (raw.includes("give notice before")) return RESIDENT_ERRORS.noticeRequired;
   if (raw.includes("doesn't match") || raw.includes("does not match")) return RESIDENT_ERRORS.conflictRetry;
   return fallback;
 }

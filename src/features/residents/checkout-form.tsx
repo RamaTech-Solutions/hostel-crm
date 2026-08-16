@@ -23,7 +23,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-export function CheckoutForm({ residentId, depositAmount }: { residentId: string; depositAmount: number }) {
+export function CheckoutForm({
+  residentId,
+  depositAmount,
+  plannedCheckoutDate,
+}: {
+  residentId: string;
+  depositAmount: number;
+  plannedCheckoutDate?: string | null;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -59,7 +67,7 @@ export function CheckoutForm({ residentId, depositAmount }: { residentId: string
         <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
           <div className="space-y-2">
             <Label>Checkout Date</Label>
-            <Input name="checkout_date" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+            <Input name="checkout_date" type="date" defaultValue={plannedCheckoutDate || format(new Date(), "yyyy-MM-dd")} required />
           </div>
           <div className="space-y-2">
             <Label>Final Payment (₹)</Label>
