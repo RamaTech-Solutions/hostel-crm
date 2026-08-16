@@ -8,6 +8,7 @@ import {
   getResidentActivity,
   getResidentStayHistory,
   getResidentCharges,
+  getRestoreStayEligibility,
 } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,11 @@ import { DocumentUploadForm } from "@/features/documents/upload-form";
 import { DeleteDocumentButton } from "@/features/documents/delete-document-button";
 import { formatCurrency, formatDate, getInitials, maskIdNumber, formatMobile } from "@/lib/utils";
 import { monthStart, formatPeriodLabel } from "@/lib/finance/period";
-import { ArrowRightLeft, LogOut, Pencil } from "lucide-react";
+import { ArrowRightLeft, LogOut, Pencil, Bell } from "lucide-react";
 import { hasOperationalContact, hasResidentIdentityDocument } from "@/lib/residents/attention";
+import { CancelNoticeButton } from "@/features/residents/cancel-notice-button";
+import { RestoreStayButton } from "@/features/residents/restore-stay-button";
+import { canRestoreStay, formatResidentActivityLine } from "@/lib/residents/notice-lifecycle";
 import type { ResidentStatus, PaymentStatus } from "@/types/database";
 
 export default async function ResidentProfilePage({
@@ -45,6 +49,9 @@ export default async function ResidentProfilePage({
   ]);
 
   if (!resident) notFound();
+
+  const restoreEligibility =
+    resident.status === "checked_out" ? await getRestoreStayEligibility(residentId) : null;
 
   const assignment = resident.bed_assignment as {
     bed?: { bed_label: string };
@@ -96,7 +103,7 @@ export default async function ResidentProfilePage({
           </div>
         </div>
         {canWrite(user) && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href={`/residents/${residentId}/edit`}>
                 <Pencil className="h-4 w-4 mr-1" />Edit
@@ -109,12 +116,24 @@ export default async function ResidentProfilePage({
                     <ArrowRightLeft className="h-4 w-4 mr-1" />Transfer
                   </Link>
                 </Button>
-                <Button variant="destructive" size="sm" asChild>
-                  <Link href={`/residents/${residentId}/checkout`}>
-                    <LogOut className="h-4 w-4 mr-1" />Checkout
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/residents/${residentId}/notice`}>
+                    <Bell className="h-4 w-4 mr-1" />
+                    {resident.status === "notice_period" ? "Update notice" : "Give notice"}
                   </Link>
                 </Button>
+                {resident.status === "notice_period" ? <CancelNoticeButton residentId={residentId} /> : null}
+                {resident.status === "notice_period" ? (
+                  <Button variant="destructive" size="sm" asChild>
+                    <Link href={`/residents/${residentId}/checkout`}>
+                      <LogOut className="h-4 w-4 mr-1" />Complete checkout
+                    </Link>
+                  </Button>
+                ) : null}
               </>
+            ) : null}
+            {restoreEligibility && canRestoreStay(user, restoreEligibility) ? (
+              <RestoreStayButton residentId={residentId} />
             ) : null}
           </div>
         )}
@@ -219,6 +238,7 @@ export default async function ResidentProfilePage({
               {history.transfers.map((row) => (
                 <div key={row.id}>Room transfer · {formatDate(row.transfer_date)}{row.reason ? ` · ${row.reason}` : ""}</div>
               ))}
+              {resident.status === "notice_period" ? <div>Notice · {formatDate(resident.planned_checkout_date)}</div> : null}
               {resident.status === "checked_out" ? <div>Checkout · {formatDate(resident.planned_checkout_date)}</div> : null}
             </CardContent>
           </Card>
@@ -372,7 +392,13 @@ export default async function ResidentProfilePage({
                   {activity.map((log) => (
                     <div key={log.id} className="flex gap-3 text-sm">
                       <span className="text-muted-foreground shrink-0">{formatDate(log.created_at)}</span>
-                      <span className="capitalize">{log.action.replace("_", " ")} — {log.entity_type}</span>
+                      <span className="capitalize">
+                        {formatResidentActivityLine(
+                          log.action,
+                          log.entity_type,
+                          (log.metadata ?? null) as Record<string, unknown> | null
+                        )}
+                      </span>
                     </div>
                   ))}
                 </div>

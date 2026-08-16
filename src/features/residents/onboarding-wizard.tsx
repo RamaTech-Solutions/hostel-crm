@@ -302,7 +302,11 @@ export function OnboardingWizard({ properties }: { properties: Property[] }) {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>Move-in date *</Label><Input type="date" value={form.joining_date} onChange={(e) => updateField("joining_date", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Planned checkout</Label><Input type="date" value={form.planned_checkout_date} onChange={(e) => updateField("planned_checkout_date", e.target.value)} /></div>
+                <div className="space-y-2">
+                  <Label>Planned checkout</Label>
+                  <Input type="date" value={form.planned_checkout_date} onChange={(e) => updateField("planned_checkout_date", e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Expected stay end. Does not put the resident on notice or vacate the bed.</p>
+                </div>
               </section>
               <section className="space-y-3">
                 <h3 className="text-sm font-medium">Financial setup</h3>

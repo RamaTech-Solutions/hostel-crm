@@ -4,6 +4,7 @@ import { getAllBeds, getProperties } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BedStatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ export default async function RoomsPage({
                     <div key={bed.id} className="flex items-center justify-between rounded-md border p-2">
                       <span className="text-sm font-medium">Bed {bed.bed_label}</span>
                       <span className="flex items-center gap-2">
+                        {bed.hasNoticeOccupant ? <Badge variant="warning">On notice</Badge> : null}
                         <span className="text-xs text-muted-foreground capitalize">{category}</span>
                         <BedStatusBadge status={bed.status as BedStatus} />
                       </span>

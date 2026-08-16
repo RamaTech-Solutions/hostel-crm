@@ -128,6 +128,11 @@ export const onboardingStaySchema = z.object({
   remarks: z.string().optional(),
 });
 
+export const noticeSchema = z.object({
+  planned_checkout_date: z.string().min(1, "Notice date is required"),
+  remarks: z.string().optional(),
+});
+
 export const checkoutSchema = z.object({
   checkout_date: z.string(),
   final_payment_amount: z.coerce.number().min(0).optional(),

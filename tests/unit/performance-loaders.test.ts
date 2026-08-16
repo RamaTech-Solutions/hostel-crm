@@ -82,7 +82,7 @@ describe("rooms occupancy reuse", () => {
     const next = file.indexOf("export async function getPayments", start);
     const fn = file.slice(start, next);
     expect(fn).not.toContain("occupancyBedsForProperties");
-    expect(fn).toContain("activeAssignmentBedIds");
+    expect(fn).toContain("activeAssignmentOccupancy");
   });
 });
 

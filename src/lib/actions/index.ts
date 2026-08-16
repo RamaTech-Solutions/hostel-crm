@@ -10,6 +10,7 @@ import {
   roomSchema,
   paymentSchema,
   checkoutSchema,
+  noticeSchema,
   transferSchema,
 } from "@/lib/validations/schemas";
 import { toUserError } from "@/lib/user-error";
@@ -20,7 +21,8 @@ import { residentCreateSchema, residentProfileEditSchema } from "@/lib/residents
 import { resolveMobileForWrite } from "@/lib/india/phone";
 import { resolveStateForWrite } from "@/lib/india/states";
 import { mapLifecycleError, RESIDENT_ERRORS } from "@/lib/residents/errors";
-import { validateCheckoutDate, validateTransferDate } from "@/lib/residents/dates";
+import { validateCheckoutDate, validateNoticeDate, validateTransferDate } from "@/lib/residents/dates";
+import { canCompleteCheckout, canGiveOrUpdateNotice, canCancelNotice, RESTORE_STAY_WARNING } from "@/lib/residents/notice-lifecycle";
 import { decideFirstPropertyAction } from "@/lib/onboarding/first-property";
 import { generateFloorRows, nextFloorNumber, defaultFloorLabel } from "@/lib/onboarding/floors";
 import { planBedReconcile, attachAssignmentHistory } from "@/lib/onboarding/beds";
@@ -834,6 +836,111 @@ export async function transferResident(residentId: string, formData: FormData) {
   return { success: true };
 }
 
+export async function giveResidentNotice(residentId: string, formData: FormData) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: RESIDENT_ERRORS.unauthorized };
+
+  const parsed = noticeSchema.safeParse({
+    planned_checkout_date: formData.get("planned_checkout_date"),
+    remarks: formData.get("remarks") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { data: resident } = await supabase.from("residents").select("id, property_id, status").eq("id", residentId).maybeSingle();
+  if (!resident || (resident.property_id && !canAccessProperty(user, resident.property_id))) {
+    return { error: RESIDENT_ERRORS.unauthorized };
+  }
+  if (!canGiveOrUpdateNotice(resident.status)) return { error: RESIDENT_ERRORS.noticeFailed };
+
+  const { data: current } = await supabase
+    .from("bed_assignments")
+    .select("start_date")
+    .eq("resident_id", residentId)
+    .eq("is_active", true)
+    .is("end_date", null)
+    .maybeSingle();
+  if (current?.start_date) {
+    const dateError = validateNoticeDate(current.start_date, parsed.data.planned_checkout_date);
+    if (dateError) return { error: dateError };
+  }
+
+  const { data: rpc, error } = await supabase.rpc("give_resident_notice", {
+    p_resident_id: residentId,
+    p_planned_checkout_date: parsed.data.planned_checkout_date,
+    p_remarks: parsed.data.remarks ?? null,
+  });
+  if (error) return { error: mapLifecycleError(error.message, RESIDENT_ERRORS.noticeFailed) };
+  const result = rpc as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) return { error: mapLifecycleError(result?.error, RESIDENT_ERRORS.noticeFailed) };
+
+  await logActivity(user.organization.id, user.id, "updated", "resident", residentId, {
+    event: "notice_given",
+    planned_checkout_date: parsed.data.planned_checkout_date,
+  });
+  revalidatePath(`/residents/${residentId}`);
+  revalidatePath("/residents");
+  revalidatePath("/dashboard");
+  revalidatePath("/rooms");
+  return { success: true };
+}
+
+export async function cancelResidentNotice(residentId: string) {
+  const user = await requireAuthUser();
+  if (!canWrite(user)) return { error: RESIDENT_ERRORS.unauthorized };
+
+  const supabase = await createClient();
+  const { data: resident } = await supabase.from("residents").select("id, property_id, status").eq("id", residentId).maybeSingle();
+  if (!resident || (resident.property_id && !canAccessProperty(user, resident.property_id))) {
+    return { error: RESIDENT_ERRORS.unauthorized };
+  }
+  if (!canCancelNotice(resident.status)) return { error: RESIDENT_ERRORS.cancelNoticeFailed };
+
+  const { data: rpc, error } = await supabase.rpc("cancel_resident_notice", {
+    p_resident_id: residentId,
+  });
+  if (error) return { error: mapLifecycleError(error.message, RESIDENT_ERRORS.cancelNoticeFailed) };
+  const result = rpc as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) return { error: mapLifecycleError(result?.error, RESIDENT_ERRORS.cancelNoticeFailed) };
+
+  await logActivity(user.organization.id, user.id, "updated", "resident", residentId, {
+    event: "notice_cancelled",
+  });
+  revalidatePath(`/residents/${residentId}`);
+  revalidatePath("/residents");
+  revalidatePath("/dashboard");
+  revalidatePath("/rooms");
+  return { success: true };
+}
+
+export async function restoreResidentStay(residentId: string) {
+  const user = await requireAuthUser();
+  if (!canOwn(user)) return { error: RESIDENT_ERRORS.unauthorized };
+
+  const supabase = await createClient();
+  const { data: resident } = await supabase.from("residents").select("id, property_id, organization_id, status").eq("id", residentId).maybeSingle();
+  if (!resident || !canAccessResidentRecord(user, resident)) {
+    return { error: RESIDENT_ERRORS.unauthorized };
+  }
+
+  const { data: rpc, error } = await supabase.rpc("restore_resident_stay", {
+    p_resident_id: residentId,
+  });
+  if (error) return { error: mapLifecycleError(error.message, RESIDENT_ERRORS.restoreFailed) };
+  const result = rpc as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) return { error: mapLifecycleError(result?.error, RESIDENT_ERRORS.restoreFailed) };
+
+  await logActivity(user.organization.id, user.id, "updated", "resident", residentId, {
+    event: "notice_given",
+    restored: true,
+  });
+  revalidatePath(`/residents/${residentId}`);
+  revalidatePath("/residents");
+  revalidatePath("/dashboard");
+  revalidatePath("/rooms");
+  return { success: true, warning: RESTORE_STAY_WARNING };
+}
+
 export async function checkoutResident(residentId: string, formData: FormData) {
   const user = await requireAuthUser();
   if (!canWrite(user)) return { error: RESIDENT_ERRORS.unauthorized };
@@ -851,6 +958,9 @@ export async function checkoutResident(residentId: string, formData: FormData) {
   const { data: resident } = await supabase.from("residents").select("id, property_id, status").eq("id", residentId).maybeSingle();
   if (!resident || (resident.property_id && !canAccessProperty(user, resident.property_id))) {
     return { error: RESIDENT_ERRORS.unauthorized };
+  }
+  if (!canCompleteCheckout(resident.status) && resident.status !== "checked_out") {
+    return { error: RESIDENT_ERRORS.noticeRequired };
   }
 
   const { data: current } = await supabase

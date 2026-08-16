@@ -48,6 +48,7 @@ export type BedWithRelations = Bed & {
   property?: { id?: string; name: string; status?: string };
   room?: { room_number: string };
   hasActiveAssignment?: boolean;
+  hasNoticeOccupant?: boolean;
 };
 
 export type RoomWithBeds = Omit<Room, "beds"> & {
@@ -60,15 +61,28 @@ import { mapRoomsWithActiveAssignments } from "@/lib/inventory/rooms-with-beds";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
-async function activeAssignmentBedIds(supabase: ServerSupabase, propertyIds: string[]) {
-  if (!propertyIds.length) return new Set<string>();
+async function activeAssignmentOccupancy(supabase: ServerSupabase, propertyIds: string[]) {
+  if (!propertyIds.length) return { active: new Set<string>(), noticeBeds: new Set<string>() };
   const { data: assignments } = await supabase
     .from("bed_assignments")
-    .select("bed_id")
+    .select("bed_id, resident:residents(status)")
     .in("property_id", propertyIds)
     .eq("is_active", true)
     .is("end_date", null);
-  return new Set((assignments ?? []).map((row) => row.bed_id));
+  const active = new Set<string>();
+  const noticeBeds = new Set<string>();
+  for (const row of assignments ?? []) {
+    active.add(row.bed_id);
+    const resident = row.resident as { status?: string } | { status?: string }[] | null;
+    const status = Array.isArray(resident) ? resident[0]?.status : resident?.status;
+    if (status === "notice_period") noticeBeds.add(row.bed_id);
+  }
+  return { active, noticeBeds };
+}
+
+async function activeAssignmentBedIds(supabase: ServerSupabase, propertyIds: string[]) {
+  const { active } = await activeAssignmentOccupancy(supabase, propertyIds);
+  return active;
 }
 
 export async function occupancyBedsForProperties(supabase: ServerSupabase, propertyIds: string[]) {
@@ -461,6 +475,54 @@ export async function getResidentStayHistory(residentId: string) {
   return { assignments: assignments ?? [], transfers: transfers ?? [] };
 }
 
+export async function getRestoreStayEligibility(residentId: string) {
+  const supabase = await createClient();
+  const [{ data: resident }, { data: activeSelf }, { data: last }] = await Promise.all([
+    supabase.from("residents").select("status").eq("id", residentId).maybeSingle(),
+    supabase
+      .from("bed_assignments")
+      .select("id")
+      .eq("resident_id", residentId)
+      .eq("is_active", true)
+      .is("end_date", null)
+      .maybeSingle(),
+    supabase
+      .from("bed_assignments")
+      .select("bed_id, bed:beds(status), property:properties(status)")
+      .eq("resident_id", residentId)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const bed = last?.bed as { status?: string } | { status?: string }[] | null;
+  const property = last?.property as { status?: string } | { status?: string }[] | null;
+  const bedStatus = Array.isArray(bed) ? bed[0]?.status : bed?.status;
+  const propertyStatus = Array.isArray(property) ? property[0]?.status : property?.status;
+  const bedId = last?.bed_id as string | undefined;
+
+  let bedHasActiveAssignment = false;
+  if (bedId) {
+    const { data: occupier } = await supabase
+      .from("bed_assignments")
+      .select("id")
+      .eq("bed_id", bedId)
+      .eq("is_active", true)
+      .is("end_date", null)
+      .maybeSingle();
+    bedHasActiveAssignment = Boolean(occupier);
+  }
+
+  return {
+    residentStatus: resident?.status ?? "",
+    hasActiveAssignment: Boolean(activeSelf),
+    hasLastAssignment: Boolean(last),
+    bedHasActiveAssignment,
+    bedStatus: bedStatus ?? "",
+    propertyStatus: propertyStatus ?? "",
+  };
+}
+
 export async function getResidentPayments(residentId: string): Promise<Payment[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -536,17 +598,18 @@ export async function getAllBeds(user: AuthUser, propertyId?: string): Promise<B
   const scoped = propertyId && ids.includes(propertyId) ? [propertyId] : ids;
   if (!scoped.length) return [];
 
-  const [{ data }, active] = await Promise.all([
+  const [{ data }, occupancy] = await Promise.all([
     supabase
       .from("beds")
       .select("id, property_id, organization_id, room_id, bed_label, status, monthly_rent, created_at, updated_at, room:rooms(room_number), property:properties(id, name, status)")
       .in("property_id", scoped)
       .order("status"),
-    activeAssignmentBedIds(supabase, scoped),
+    activeAssignmentOccupancy(supabase, scoped),
   ]);
   return ((data ?? []) as unknown as BedWithRelations[]).map((bed) => ({
     ...bed,
-    hasActiveAssignment: active.has(bed.id),
+    hasActiveAssignment: occupancy.active.has(bed.id),
+    hasNoticeOccupant: occupancy.noticeBeds.has(bed.id),
   }));
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { residentCreateDetailsSchema, residentStaySchema } from "@/lib/residents/validation";
 import { identityForPersistence } from "@/lib/residents/identity";
-import { validateCheckoutDate, validateTransferDate } from "@/lib/residents/dates";
+import { validateCheckoutDate, validateNoticeDate, validateTransferDate } from "@/lib/residents/dates";
 import { isBedAssignable, nextBedStatusAfterAssignmentEnd } from "@/lib/residents/eligibility";
 import { mapLifecycleError, RESIDENT_ERRORS } from "@/lib/residents/errors";
 import { classifyBed, summarizeOccupancy } from "@/lib/inventory/occupancy";
@@ -54,6 +54,11 @@ describe("dates", () => {
 
   it("rejects checkout before assignment start", () => {
     expect(validateCheckoutDate("2026-08-10", "2026-08-01")).toBe(RESIDENT_ERRORS.checkoutDate);
+  });
+
+  it("rejects notice before assignment start", () => {
+    expect(validateNoticeDate("2026-08-10", "2026-08-01")).toBe(RESIDENT_ERRORS.noticeDate);
+    expect(validateNoticeDate("2026-08-10", "2026-08-10")).toBeNull();
   });
 });
 

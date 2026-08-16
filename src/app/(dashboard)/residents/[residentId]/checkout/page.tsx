@@ -30,6 +30,10 @@ export default async function CheckoutPage({
     );
   }
 
+  if (resident.status !== "notice_period") {
+    redirect(`/residents/${residentId}/notice`);
+  }
+
   return (
     <div>
       <Breadcrumbs items={[
@@ -38,7 +42,11 @@ export default async function CheckoutPage({
         { label: "Checkout" },
       ]} />
       <h1 className="mb-6 text-[32px] font-semibold leading-10 tracking-tight">Checkout — {resident.full_name}</h1>
-      <CheckoutForm residentId={residentId} depositAmount={Number(resident.security_deposit_amount)} />
+      <CheckoutForm
+        residentId={residentId}
+        depositAmount={Number(resident.security_deposit_amount)}
+        plannedCheckoutDate={resident.planned_checkout_date}
+      />
     </div>
   );
 }
