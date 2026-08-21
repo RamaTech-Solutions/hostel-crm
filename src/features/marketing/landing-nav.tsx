@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { AwaaslyLogo } from "@/components/brand/awaasly-logo";
 import { getDemoHref, getPublicSignupHref } from "@/lib/app-url";
 
+const navLinks = [
+  { href: "#features", label: "Features" },
+  { href: "#how-it-works", label: "How It Works" },
+  { href: "#pricing", label: "Pricing" },
+  { href: "#faq", label: "FAQ" },
+] as const;
+
 export function LandingNav({ showDashboard }: { showDashboard: boolean }) {
   const [open, setOpen] = useState(false);
 
@@ -17,35 +24,61 @@ export function LandingNav({ showDashboard }: { showDashboard: boolean }) {
           <AwaaslyLogo variant="primary" placement="navbar" alt="" priority />
         </Link>
         <nav className="hidden items-center gap-6 text-sm md:flex">
-          <a href="#features" className="text-muted-foreground hover:text-foreground">Features</a>
-          <a href="#how-it-works" className="text-muted-foreground hover:text-foreground">How It Works</a>
-          <a href="#pricing" className="text-muted-foreground hover:text-foreground">Pricing</a>
-          <Link href={getDemoHref()} className="text-muted-foreground hover:text-foreground">Explore Demo</Link>
+          {navLinks.map((link) => (
+            <a key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground">
+              {link.label}
+            </a>
+          ))}
+          <Link href={getDemoHref()} className="text-muted-foreground hover:text-foreground">
+            Explore Demo
+          </Link>
           {showDashboard ? (
-            <Button asChild size="sm"><Link href="/dashboard">Dashboard</Link></Button>
+            <Button asChild size="sm">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
           ) : (
             <>
-              <Link href="/login" className="text-muted-foreground hover:text-foreground">Login</Link>
-              <Button asChild size="sm"><Link href={getPublicSignupHref()}>Start Free</Link></Button>
+              <Link href="/login" className="text-muted-foreground hover:text-foreground">
+                Login
+              </Link>
+              <Button asChild size="sm">
+                <Link href={getPublicSignupHref()}>Start Free</Link>
+              </Button>
             </>
           )}
         </nav>
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen((v) => !v)} aria-label="Menu">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Menu"
+        >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       </div>
       {open && (
         <div className="space-y-3 border-t px-4 py-3 md:hidden">
-          <a href="#features" className="block text-sm" onClick={() => setOpen(false)}>Features</a>
-          <a href="#how-it-works" className="block text-sm" onClick={() => setOpen(false)}>How It Works</a>
-          <a href="#pricing" className="block text-sm" onClick={() => setOpen(false)}>Pricing</a>
-          <Link href={getDemoHref()} className="block text-sm">Explore Demo</Link>
+          {navLinks.map((link) => (
+            <a key={link.href} href={link.href} className="block text-sm" onClick={() => setOpen(false)}>
+              {link.label}
+            </a>
+          ))}
+          <Link href={getDemoHref()} className="block text-sm">
+            Explore Demo
+          </Link>
           {showDashboard ? (
-            <Button asChild className="w-full"><Link href="/dashboard">Dashboard</Link></Button>
+            <Button asChild className="w-full">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
           ) : (
             <>
-              <Link href="/login" className="block text-sm">Login</Link>
-              <Button asChild className="w-full"><Link href={getPublicSignupHref()}>Start Free</Link></Button>
+              <Link href="/login" className="block text-sm">
+                Login
+              </Link>
+              <Button asChild className="w-full">
+                <Link href={getPublicSignupHref()}>Start Free</Link>
+              </Button>
             </>
           )}
         </div>

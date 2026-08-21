@@ -13,17 +13,27 @@ const appUrl = getAppUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Awaasly — Every property. One place.",
+    default: "PG Management Software for India | Awaasly",
     template: "%s · Awaasly",
   },
-  description: "PG & Hostel Operations Platform. Manage properties, rooms, residents and collections from one place. A product of Ramatech Innovation Pvt Ltd.",
+  description:
+    "Awaasly is PG management software for Indian PG and hostel owners. Manage multiple properties, residents, rooms, beds, occupancy and rent collection from one place.",
+  keywords: [
+    "PG management software",
+    "hostel management",
+    "PG occupancy",
+    "rent collection",
+    "multi-property PG",
+    "Awaasly",
+  ],
   applicationName: "Awaasly",
   icons: {
     icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
   },
   openGraph: {
-    title: "Awaasly — Run all your PGs from one place",
-    description: "PG & Hostel Operations Platform by Ramatech Innovation Pvt Ltd.",
+    title: "Awaasly — Run every PG from one place",
+    description:
+      "Manage residents, occupancy, rooms, beds and rent across every PG you operate — built for Indian PG and hostel owners.",
     url: appUrl,
     siteName: "Awaasly",
     type: "website",
